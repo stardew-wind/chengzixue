@@ -2799,19 +2799,20 @@ function buildContent(data){
     h += '<div class="info">📋 资源使用明细（共 '+fmt(data.length)+' 条）</div>';
     h += '<input type="text" class="search-box" id="detail-search" placeholder="🔍 搜索资源标题..." oninput="filterDetail()">';
 
-    // 按一级场景分组展示资源明细
-    var scene1Groups = {};
+    // 按业务板块（轻松学/精准练/模拟卷）分组展示资源明细
+    var categoryGroups = {};
     data.forEach(function(r){
-      var s1 = r.scene1 || '未分类';
-      if(!scene1Groups[s1]) scene1Groups[s1] = [];
-      scene1Groups[s1].push(r);
+      var cat = mapModuleToCategory(r.module || '') || '未分类';
+      if(!categoryGroups[cat]) categoryGroups[cat] = [];
+      categoryGroups[cat].push(r);
     });
 
-    // 按一级场景顺序排序
-    var scene1Order = SCENE1_LIST;
-    var sortedScene1 = Object.keys(scene1Groups).sort(function(a,b){
-      var ia = scene1Order.indexOf(a);
-      var ib = scene1Order.indexOf(b);
+    // 按板块固定顺序排序
+    var catOrder = ['轻松学', '精准练', '模拟卷', '未分类'];
+    var catColors = {'轻松学':'#2563EB', '精准练':'#10B981', '模拟卷':'#F59E0B', '未分类':'#6366F1'};
+    var sortedCat = Object.keys(categoryGroups).sort(function(a,b){
+      var ia = catOrder.indexOf(a);
+      var ib = catOrder.indexOf(b);
       if(ia === -1 && ib === -1) return a.localeCompare(b);
       if(ia === -1) return 1;
       if(ib === -1) return -1;
@@ -2819,19 +2820,19 @@ function buildContent(data){
     });
 
     var totalShown = 0;
-    var maxPerGroup = 50; // 每个场景最多显示50条
+    var maxPerGroup = 50; // 每个板块最多显示50条
 
-    sortedScene1.forEach(function(s1){
-      var groupData = scene1Groups[s1];
+    sortedCat.forEach(function(cat){
+      var groupData = categoryGroups[cat];
       if(!groupData || groupData.length === 0) return;
 
-      // 场景分组标题
-      var sceneColor = SCENE_COLORS[s1] || '#6366F1';
-      h += '<div style="margin:12px 0 8px 0;padding:8px 12px;background:linear-gradient(90deg,'+sceneColor+'15,'+sceneColor+'05);border-left:4px solid '+sceneColor+';border-radius:4px;display:flex;align-items:center;justify-content:space-between;">';
-      h += '<span style="font-weight:600;color:'+sceneColor+';">📁 '+esc(s1)+' <span style="font-size:12px;font-weight:400;color:var(--t3);">('+fmt(groupData.length)+'条)</span></span>';
+      // 板块分组标题
+      var catColor = catColors[cat] || '#6366F1';
+      h += '<div style="margin:12px 0 8px 0;padding:8px 12px;background:linear-gradient(90deg,'+catColor+'15,'+catColor+'05);border-left:4px solid '+catColor+';border-radius:4px;display:flex;align-items:center;justify-content:space-between;">';
+      h += '<span style="font-weight:600;color:'+catColor+';">📦 '+esc(cat)+' <span style="font-size:12px;font-weight:400;color:var(--t3);">('+fmt(groupData.length)+'条)</span></span>';
       h += '</div>';
 
-      // 数据问题汇总（每个场景下）
+      // 数据问题汇总（每个板块下）
       var dataIssues = analyzeDataIssues(groupData);
       if(dataIssues.hasIssues){
         h += '<div class="data-issues-box" style="margin:8px 0 12px 0;padding:10px 14px;background:#FEF2F2;border:1px solid #FECACA;border-radius:8px;font-size:12px;">';
@@ -2845,14 +2846,14 @@ function buildContent(data){
         h += '</div></div>';
       }
 
-      // 该场景下的资源表格
-      h += '<div class="tbl-wrap" style="margin-bottom:16px;"><table class="data-table thin detail-scene-table" data-scene1="'+esc(s1)+'"><thead><tr><th>资源标题</th><th>学段</th><th>学科</th><th>资源分类</th><th>年级</th><th>版本</th><th>下载用户</th><th>预览用户</th><th>视频用户</th><th>PV</th><th>UV</th></tr></thead><tbody>';
+      // 该板块下的资源表格
+      h += '<div class="tbl-wrap" style="margin-bottom:16px;"><table class="data-table thin detail-scene-table" data-category="'+esc(cat)+'"><thead><tr><th>资源标题</th><th>学段</th><th>学科</th><th>资源分类</th><th>年级</th><th>版本</th><th>下载用户</th><th>预览用户</th><th>视频用户</th><th>PV</th><th>UV</th></tr></thead><tbody>';
       groupData.slice(0, maxPerGroup).forEach(function(r){
         h += '<tr><td style="max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(r.title)+'">'+esc(r.title||'-')+'</td><td>'+esc(r.stage||'-')+'</td><td><span class="tag tb">'+esc(r.course||'-')+'</span></td><td>'+esc(r.module||'-')+'</td><td>'+esc(r.grade||'-')+'</td><td>'+esc(r.version||'-')+'</td><td class="num">'+sv(r.download)+'</td><td class="num">'+sv(r.preview)+'</td><td class="num">'+sv(r.video_users||0)+'</td><td class="num">'+sv(r.pv,1)+'</td><td class="num">'+sv(r.uv,1)+'</td></tr>';
       });
       h += '</tbody></table></div>';
       if(groupData.length > maxPerGroup){
-        h += '<div style="text-align:center;padding:6px;font-size:11px;color:var(--t3);margin-bottom:12px;">'+esc(s1)+' 显示前 '+maxPerGroup+' 条，共 '+fmt(groupData.length)+' 条</div>';
+        h += '<div style="text-align:center;padding:6px;font-size:11px;color:var(--t3);margin-bottom:12px;">'+esc(cat)+' 显示前 '+maxPerGroup+' 条，共 '+fmt(groupData.length)+' 条</div>';
       }
       totalShown += Math.min(groupData.length, maxPerGroup);
     });
