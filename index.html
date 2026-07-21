@@ -32,27 +32,44 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Noto Sans SC',sans
 .kpi-val{font-size:22px;font-weight:700}.kpi-sub{font-size:10px;color:var(--t3);margin-top:2px}
 .c-p .kpi-val{color:var(--blue)}.c-s .kpi-val{color:var(--g)}.c-i .kpi-val{color:var(--i)}.c-w .kpi-val{color:var(--y)}.c-d .kpi-val{color:var(--r)}
 .row{display:grid;gap:12px;margin-bottom:12px}.r2{grid-template-columns:1fr 1fr}.r1{grid-template-columns:1fr}.r3{grid-template-columns:1fr 1fr 1fr}
-.box{background:var(--w);border-radius:10px;padding:14px;box-shadow:var(--shadow)}
+.box{background:var(--w);border-radius:10px;padding:14px;box-shadow:var(--shadow);min-width:0}
 .box-hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
 .box-ttl{font-size:14px;font-weight:600}.box-sub{font-size:11px;color:var(--t3)}
 .chart{width:100%;height:280px}.chart.tall{height:340px}
 .tbl{width:100%;border-collapse:collapse;font-size:11px}
 .tbl th{background:var(--s);padding:8px 10px;text-align:left;font-weight:600;color:var(--t2);border-bottom:2px solid var(--b);white-space:nowrap;position:sticky;top:0}
 .tbl td{padding:6px 10px;border-bottom:1px solid var(--b)}.tbl tr:hover td{background:var(--s)}
-.tbl-wrap{max-height:400px;overflow-y:auto;border-radius:8px;border:1px solid var(--b)}
+.tbl-wrap{max-height:320px;overflow:auto;border-radius:8px;border:1px solid var(--b);position:relative;min-width:100%;width:100%}
+.tbl-wrap .module-matrix-table{table-layout:fixed;width:100%;border-collapse:collapse}
+.tbl-wrap .module-matrix-table th,
+.tbl-wrap .module-matrix-table td{white-space:nowrap!important;overflow:hidden;text-overflow:ellipsis;box-sizing:border-box}
+.tbl-wrap .module-matrix-table th:first-child,
+.tbl-wrap .module-matrix-table td:first-child{text-align:left}
+.tbl-wrap .module-matrix-table th:not(:first-child),
+.tbl-wrap .module-matrix-table td:not(:first-child){text-align:center}
 /* ===== 统一数据表格样式 ===== */
-.data-table{width:100%;border-collapse:collapse;font-size:12px;background:var(--w);border-radius:8px;overflow:hidden;box-shadow:var(--shadow)}
-.data-table th{background:var(--s);padding:10px 12px;text-align:center;font-weight:600;color:var(--t2);border-bottom:2px solid var(--b);white-space:nowrap;position:sticky;top:0}
+.data-table{width:100%;border-collapse:collapse;font-size:12px;background:var(--w);border-radius:8px;overflow:visible;box-shadow:var(--shadow)}
+.data-table th{background:var(--s);padding:10px 12px;text-align:center;font-weight:600;color:var(--t2);border-bottom:2px solid var(--b);white-space:nowrap;position:sticky;top:0;z-index:10;box-shadow:0 2px 4px rgba(0,0,0,0.05)}
 .data-table td{padding:8px 12px;text-align:center;border-bottom:1px solid var(--b)}
 .data-table td.name{text-align:left;font-weight:500}
 .data-table td.num{text-align:right;font-variant-numeric:tabular-nums}
 .data-table .up{color:var(--g);font-weight:600}.data-table .down{color:var(--r);font-weight:600}
-/* 明细表格变体：更紧凑 */
-.data-table.compact{font-size:11px}
-.data-table.compact th{padding:8px 10px;text-align:left}
-.data-table.compact td{padding:6px 10px;text-align:left}
-.data-table.compact td.num{text-align:right}
-.data-table.compact tr:hover td{background:var(--s)}
+/* 资源明细单表滚动方案：表头sticky，只保留一个横向滚动条 */
+.detail-wrap{border:1px solid var(--b);border-radius:8px;overflow:auto;margin-bottom:16px;box-shadow:var(--shadow);position:relative;max-height:420px}
+.detail-table{width:100%;border-collapse:collapse;table-layout:auto;min-width:1400px;margin:0;border-radius:0;box-shadow:none;background:var(--w);font-size:12px}
+.detail-table th{padding:10px 12px;text-align:center;font-weight:600;color:var(--t2);background:var(--s);border-bottom:2px solid var(--b);white-space:nowrap;position:sticky;top:0;z-index:10;box-shadow:0 2px 4px rgba(0,0,0,0.05)}
+.detail-table th.name{text-align:left}
+.detail-table th.sortable{cursor:pointer;user-select:none;transition:.15s}
+.detail-table th.sortable:hover{background:#E2E8F0;color:var(--blue)}
+.detail-table th.sortable::after{content:'⇅';font-size:10px;color:var(--t3);margin-left:4px;opacity:.5}
+.detail-table th.sortable.sort-asc::after{content:'▲';color:var(--blue);opacity:1}
+.detail-table th.sortable.sort-desc::after{content:'▼';color:var(--blue);opacity:1}
+.detail-table th.sort-asc,.detail-table th.sort-desc{background:#DBEAFE;color:var(--blue)}
+.detail-table td{padding:8px 12px;text-align:center;border-bottom:1px solid var(--b);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.detail-table td.name{text-align:left}
+.detail-table td.num{text-align:right;font-variant-numeric:tabular-nums}
+.detail-table tr:hover td{background:var(--s)}
+.detail-table tbody tr:last-child td{border-bottom:0}
 /* 矩阵表格变体 */
 .data-table.matrix{font-size:12px}
 .data-table.matrix th{padding:8px 10px;font-size:11px}
@@ -103,7 +120,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Noto Sans SC',sans
 .insight-box .tag-warn{background:#FEF3C7;color:#D97706}
 .insight-box .tag-bad{background:#FEE2E2;color:#EF4444}
 .insight-box .tag-info{background:#DBEAFE;color:var(--blue)}
-.module-matrix-table{width:100%;border-collapse:collapse;font-size:12px}
+/* 矩阵表格：在 .tbl-wrap 内由 .tbl-wrap .module-matrix-table 统一控制，此处不再定义 table-layout/width，避免覆盖固定列宽 */
 .module-matrix-table th{background:var(--s);padding:8px 10px;text-align:center;font-weight:600;color:var(--t2);border-bottom:2px solid var(--b);font-size:11px}
 .module-matrix-table td{padding:6px 10px;text-align:center;border-bottom:1px solid var(--b)}
 .module-matrix-table td.name{text-align:left;font-weight:500}
@@ -292,13 +309,19 @@ function resMap(r){
   return {
     source: decode(r.s,'s'), stage: decode(r.st,'st'), course: decode(r.c,'c'),
     grade: decode(r.g,'g'), version: decode(r.v,'v'), module: decode(r.m,'m'),
+    materialType: decode(r.mt,'mt'),
+    resourceType: inferResourceType(decode(r.m,'m')),
     scene1: decode(r.s1,'s1'), scene2: decode(r.s2,'s2'),
-    title: r.t||'',
-    pv: r.p||0, uv: r.u||0, download: r.d||0, preview: r.pr||0, video_users: r.vd||0,
-    total_users: r.tu||0, paid_users: r.pd||0, use_rate: r.ur||'', convert_rate: r.cr||'',
+    title: r.t||'', resourceId: r.rid||'',
+    pv: r.p||0, uv: r.u||0,
+    downloadCount: r.dc||0, download: r.d||0,
+    previewCount: r.pc||0, preview: r.pr||0,
+    videoCount: r.vc||0, video_users: r.vd||0,
+    total_users: r.tu||0, paid_users: r.pd||0,
+    use_rate: r.ur||'', convert_rate: r.cr||'',
     date: r.dt||'',
-    phase: decode(r.s,'s'),  // 数据阶段（如 25-26春季期中）
-    aggLevel: r.al||'d'     // 's'=聚合粒度(课程汇总), 'd'=资源级
+    phase: decode(r.s,'s'),
+    aggLevel: r.al||'d'
   };
 }
 
@@ -929,6 +952,33 @@ var MODULE_SCENE_MAP = {
   '开学收心测': ['寒假']
 };
 
+// 资源类型（文件类型）推断：talos / PDF / SRM题 / 视频 / HTML
+// 数据源目前没有该字段，但未来会从内容明细接入；当前按模块名推断兜底
+function inferResourceType(moduleName){
+  if(!moduleName) return 'talos';
+  var m = String(moduleName).trim();
+  if(!m) return 'talos';
+
+  // 视频类
+  var video = ['视频','播放','典例精讲','高效学视频'];
+  if(video.some(function(k){ return m.indexOf(k) >= 0; })) return '视频';
+
+  // SRM题 / 在线练 / 题组
+  var srm = ['在线练','SRM','题组','题组访问','SRM阶段复习题','SRM习题','自适应练','课时练习'];
+  if(srm.some(function(k){ return m.indexOf(k) >= 0; })) return 'SRM题';
+
+  // HTML / 交互类
+  var html = ['交互素材','交互式知识讲解','课文','互动','H5','HTML'];
+  if(html.some(function(k){ return m.indexOf(k) >= 0; })) return 'HTML';
+
+  // PDF / 文档类（课件、学案、知识梳理、试卷等）
+  var pdf = ['课件','学案','知识梳理','知识总结','单元知识图谱','学方法','学典例','一轮知识清单','新知预习单','同步学案','测试卷','模拟卷','单元试卷','结构化单元卷','最后一卷','三轮冲刺攻略','试卷','练习','专项'];
+  if(pdf.some(function(k){ return m.indexOf(k) >= 0; })) return 'PDF';
+
+  // 兜底：talos（橙子学默认资源类型）
+  return 'talos';
+}
+
 // 资源分类 -> 业务板块（轻松学/精准练/模拟卷）映射
 // 用于大盘总览的板块对比表格
 function mapModuleToCategory(moduleName){
@@ -939,7 +989,7 @@ function mapModuleToCategory(moduleName){
   // 轻松学：学的板块（精确匹配）
   var qingsong = ['同步学案', '知识梳理', '视频', '交互素材', '交互式知识讲解', '课文',
                   '单元知识图谱', '学方法·攻难点', '学典例·会方法', '一轮知识清单',
-                  '课件', '新知预习单', '典例精讲', '课程汇总', '轻松学',
+                  '课件', '新知预习单', '课程汇总', '轻松学',
                   '考点清单', '记背清单', '记背专区'];
   // 精准练：练的板块（以课为节点，精确匹配）
   var jingzhun = ['课时练习', '在线练', '素养提升练', '专项练习', '自适应练',
@@ -947,7 +997,7 @@ function mapModuleToCategory(moduleName){
                   '专项', '重难专项', '重难专练', '必练专项', '易错专项',
                   '实验专项', '积累运用', '解决问题', '基础必考', '阅读理解',
                   '考题猜想', '好题汇编', '写作', '词汇', '记背专项', '记背默写',
-                  '高效学', '考点模拟'];
+                  '高效学', '考点模拟', '典例精讲'];
   // 模拟卷：模拟考试（以阶段/单元为节点，精确匹配）
   var moni = ['单元试卷', '结构化单元卷', '模拟卷', '最后一卷', '三轮冲刺攻略',
               '测试卷', '开学收心测', '试卷', '压轴突破'];
@@ -994,8 +1044,16 @@ function buildFilters(){
   buildCourseSelect();
   // 版本：始终展示完整列表
   buildVersionSelect();
-  // 资源分类按一级场景分组初始化
-  buildModuleFilterGrouped();
+  // 资源分类下拉：固定资源类型（talos / PDF / SRM题 / 视频 / HTML）
+  var RESOURCE_TYPES = ['talos', 'PDF', 'SRM题', '视频', 'HTML'];
+  var moduleSelect = document.getElementById('fg-module');
+  if(moduleSelect){
+    var h = '<option value="">全部资源分类</option>';
+    RESOURCE_TYPES.forEach(function(t){
+      h += '<option value="' + t + '">' + t + '</option>';
+    });
+    moduleSelect.innerHTML = h;
+  }
 
   // 构建年级下拉框
   buildGradeSelect();
@@ -1311,95 +1369,32 @@ function onScene2Change(select){
   markFilterPending();
 }
 
-// 构建资源分类下拉框（按一级场景分组）
-// 支持两种模式：
-// 1. 无参数：显示全部数据中的资源分类（初始化/重置时用）
-// 2. 有参数：基于当前筛选条件过滤后的数据，仍按一级场景分组
-function buildModuleFilterGrouped(filteredData){
+// 构建资源分类下拉框（固定资源类型：talos / PDF / SRM题 / 视频 / HTML）
+function buildModuleFilterGrouped(){
   var moduleSelect = document.getElementById('fg-module');
   if(!moduleSelect) return;
 
+  var RESOURCE_TYPES = ['talos', 'PDF', 'SRM题', '视频', 'HTML'];
   var h = '<option value="">全部资源分类</option>';
-
-  // 使用传入的数据或全部数据
-  var data = filteredData || ALL_RES;
-
-  // 按一级场景分组显示资源分类
-  SCENE1_LIST.forEach(function(s1){
-    // 获取该场景下、在当前筛选条件下实际存在的资源分类
-    var sceneData = data.filter(function(r){ return r.scene1 === s1; });
-    var actualModules = sceneData.map(function(r){ return r.module; })
-      .filter(function(v, i, a){ return v && v !== '阶段复习' && v !== '假期综合' && v !== '同步学习' && v !== '备考冲刺' && a.indexOf(v) === i; });
-
-    if(actualModules.length === 0) return;
-
-    // 按一级场景分组显示
-    h += '<optgroup label="' + s1 + '">';
-    actualModules.sort().forEach(function(m){ h += '<option value="' + m + '">' + m + '</option>'; });
-    h += '</optgroup>';
+  RESOURCE_TYPES.forEach(function(t){
+    h += '<option value="' + t + '">' + t + '</option>';
   });
-
   moduleSelect.innerHTML = h;
 }
 
-// 根据当前所有筛选条件更新资源分类下拉框（始终按一级场景分组）
+// 根据当前所有筛选条件更新资源分类下拉框（固定类型，无需联动过滤）
 function updateModuleFilterByCurrentFilters(){
-  // 获取当前筛选条件下的数据（排除module筛选本身，避免循环依赖）
-  var data = ALL_RES;
-  for(var dim in ACT){
-    if(dim === 'module') continue; // 跳过module自身
-    var vals = ACT[dim];
-    if(!Array.isArray(vals) || vals.length === 0) continue;
-    if(dim === 'scene1'){
-      data = data.filter(function(r){ return vals.indexOf(r.scene1) >= 0; });
-    } else if(dim === 'scene2'){
-      data = data.filter(function(r){ return vals.indexOf(r.scene2) >= 0; });
-    } else {
-      data = data.filter(function(r){ var v = (r[dim] || '').toString(); return vals.indexOf(v) >= 0; });
-    }
-  }
-  buildModuleFilterGrouped(data);
+  buildModuleFilterGrouped();
 }
 
-// 恢复资源分类为全部选项（按一级场景分组）
+// 恢复资源分类为全部选项
 function resetModuleFilter(){
   buildModuleFilterGrouped();
 }
 
-// 资源分类变化时联动场景
 function onModuleChange(select){
   var val = select.value;
   if(val){ ACT['module'] = [val]; } else { delete ACT['module']; }
-
-  // 反向联动：根据资源分类推荐场景
-  var scene1Select = document.getElementById('fg-scene1');
-  var scene2Select = document.getElementById('fg-scene2');
-
-  if(val && MODULE_SCENE_MAP[val]){
-    var suggestedScenes = MODULE_SCENE_MAP[val];
-    // 如果当前没有选场景，自动推荐
-    if(!scene1Select.value && suggestedScenes.length > 0){
-      // 如果资源分类只对应一个场景，直接选中
-      if(suggestedScenes.length === 1){
-        var suggestedScene1 = suggestedScenes[0];
-        scene1Select.value = suggestedScene1;
-        ACT['scene1'] = [suggestedScene1];
-
-        // 更新二级场景
-        var allScene2 = ALL_RES.filter(function(r){ return r.scene1 === suggestedScene1; })
-          .map(function(r){ return r.scene2; })
-          .filter(function(v, i, a){ return v && a.indexOf(v) === i; });
-        var h2 = '<option value="">全部二级场景</option>';
-        allScene2.sort().forEach(function(v){ h2 += '<option value="' + v + '">' + v + '</option>'; });
-        scene2Select.innerHTML = h2;
-
-        // 更新资源分类显示（按场景分组）
-        updateModuleFilterByCurrentFilters();
-      }
-      // 如果资源分类对应多个场景（如模拟卷），不自动选择场景，保持当前分组显示
-    }
-  }
-
   markFilterPending();
 }
 
@@ -1671,9 +1666,9 @@ function show(id){
 function resizeCharts(){ setTimeout(function(){ Object.values(CH).forEach(function(c){ try{c.resize();}catch(e){} }); }, 50); }
 window.addEventListener('resize', resizeCharts);
 
-function fmt(n){ return n!=null?Number(n).toLocaleString():'0'; }
-function esc(s){ return s!=null?String(s).replace(/</g,'&lt;').replace(/>/g,'&gt;'):''; }
-function sv(v,d){ d=d||0; if(v===null||v===undefined||isNaN(v)||v===Infinity) return '--'; return v>=1e4?(v/1e4).toFixed(d)+'万':v.toLocaleString(); }
+function fmt(n){ return n!=null && !isNaN(n) ? Number(n).toLocaleString() : '0'; }
+function esc(s){ return s!=null ? String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,'&#39;').replace(/</g,'&lt;').replace(/>/g,'&gt;') : ''; }
+function sv(v,d){ d=d||0; if(v===null || v===undefined || v==='' || isNaN(v) || v===Infinity) return '--'; return v>=1e4?(v/1e4).toFixed(d)+'万':v.toLocaleString(); }
 
 // ===== 安全值处理函数（新增）=====
 /**
@@ -1728,9 +1723,14 @@ function findKpKey(kpData, context) {
 	// 应强制走 detail 分支 → 去重指标显示"数据不足"。
 	var hasModule = !!(context.module);
 	var hasScene = !!(context.scene1 || context.scene2);
-	var hasSliceDim = !!(course || stage || grade || version || category || hasModule);
+	var hasResourceType = !!(context.resourceType);
+	var hasSliceDim = !!(course || stage || grade || version || category || hasModule || hasResourceType);
 	// 仅含场景维度(无其它切片)时，视同"该维度无聚合"，直接返回 null，禁止回退总览
 	if (hasScene && !hasSliceDim) {
+		return null;
+	}
+	// resourceType（资源分类）维度没有 kp 聚合，禁止回退总览，避免假数据
+	if (hasResourceType && !hasSliceDim) {
 		return null;
 	}
 	if (!hasSliceDim && phase) {
@@ -2037,9 +2037,9 @@ function safeValue(value, options) {
  * 返回：'XX%' / 'XX.XX%' / '--'（数据缺失）
  */
 function fmtUseRate(rate) {
-  if (rate === null || rate === undefined || isNaN(rate)) return '--';
-  // 保留两位小数，去掉末尾多余的 0
+  if (rate === null || rate === undefined || rate === '' || !Number.isFinite(Number(rate))) return '--';
   var num = parseFloat(rate);
+  if (isNaN(num)) return '--';
   var str = num.toFixed(2);
   if (str.endsWith('.00')) str = str.slice(0, -3);
   else if (str.endsWith('0')) str = str.slice(0, -1);
@@ -2048,16 +2048,22 @@ function fmtUseRate(rate) {
 
 // 模块/分类矩阵专用：null/NaN 显示"—"（数据不足），否则显示"X%"
 function fmtPctOrDash(v) {
-  if (v === null || v === undefined || isNaN(v)) return '<span style="color:var(--t3)">—</span>';
-  return v + '%';
+  if (v === null || v === undefined || v === '' || !Number.isFinite(Number(v))) return '<span style="color:var(--t3)">—</span>';
+  var num = parseFloat(v);
+  if (isNaN(num)) return '<span style="color:var(--t3)">—</span>';
+  var str = num.toFixed(2);
+  if (str.endsWith('.00')) str = str.slice(0, -3);
+  else if (str.endsWith('0')) str = str.slice(0, -1);
+  return str + '%';
 }
 
 /**
  * 百分比格式化：统一保留两位小数
  */
 function fmtPct(v) {
-  if (v === null || v === undefined || isNaN(v)) return '--';
+  if (v === null || v === undefined || v === '' || !Number.isFinite(Number(v))) return '--';
   var num = parseFloat(v);
+  if (isNaN(num)) return '--';
   var str = num.toFixed(2);
   if (str.endsWith('.00')) str = str.slice(0, -3);
   else if (str.endsWith('0')) str = str.slice(0, -1);
@@ -2095,7 +2101,22 @@ function buildMissingDataAlert(basePeriod, comparePeriod, baseCount, compareCoun
   return '<div style="padding:8px 12px;background:#FEF3C7;border:1px solid #FDE68A;border-radius:6px;color:#92400E;font-size:12px;margin-bottom:10px">' + alerts.join('<br>') + '</div>';
 }
 
-function aggBy(data,key){ var m={}; data.forEach(function(r){ if(r.aggLevel==='s') return; var k=r[key]||''; if(!k || k==='未知' || k==='nan' || k==='-') return; if(!m[k]) m[k]={pv:0,uv:0,dl:0,pr:0,ct:0,useUsers:0}; m[k].pv+=r.pv||0; m[k].uv+=r.uv||0; m[k].dl+=r.download||0; m[k].pr+=r.preview||0; m[k].ct++; m[k].useUsers+=r.total_users||0; }); return Object.entries(m).map(function(e){ return {name:e[0],pv:e[1].pv,uv:e[1].uv,dl:e[1].dl,pr:e[1].pr,ct:e[1].ct,useUsers:e[1].useUsers}; }).sort(function(a,b){ return b.pv-a.pv; }); }
+function aggBy(data,key){ var m={}; data.forEach(function(r){ if(r.aggLevel==='s') return; var k=r[key]||''; if(!k || k==='未知' || k==='nan' || k==='-') return; if(!m[k]) m[k]={pv:0,uv:0,dl:0,pr:0,ct:0,useUsers:0}; m[k].pv+=Number(r.pv)||0; m[k].uv+=Number(r.uv)||0; m[k].dl+=Number(r.download)||0; m[k].pr+=Number(r.preview)||0; m[k].ct++; m[k].useUsers+=Number(r.total_users)||0; }); return Object.entries(m).map(function(e){ return {name:e[0],pv:e[1].pv,uv:e[1].uv,dl:e[1].dl,pr:e[1].pr,ct:e[1].ct,useUsers:e[1].useUsers}; }).sort(function(a,b){ return b.pv-a.pv; }); }
+
+// 按资源类型聚合（talos / PDF / SRM题 / 视频 / HTML）
+function aggByResourceType(data){
+  var m = {};
+  data.forEach(function(r){
+    if(r.aggLevel==='s') return;
+    var rt = r.resourceType || 'talos';
+    if(!rt || rt==='未知' || rt==='nan' || rt==='-') return;
+    if(!m[rt]) m[rt] = {pv:0,uv:0,dl:0,pr:0,ct:0,useUsers:0};
+    m[rt].pv += r.pv||0; m[rt].uv += r.uv||0; m[rt].dl += r.download||0;
+    m[rt].pr += r.preview||0; m[rt].ct++; m[rt].useUsers += r.total_users||0;
+  });
+  var typeOrder = ['talos','PDF','SRM题','视频','HTML'];
+  return Object.entries(m).map(function(e){ return {name:e[0],pv:e[1].pv,uv:e[1].uv,dl:e[1].dl,pr:e[1].pr,ct:e[1].ct,useUsers:e[1].useUsers}; }).sort(function(a,b){ var ia=typeOrder.indexOf(a.name), ib=typeOrder.indexOf(b.name); if(ia!==-1 && ib!==-1) return ia-ib; if(ia!==-1) return -1; if(ib!==-1) return 1; return b.pv-a.pv; });
+}
 
 /** 按 学段+学科 分组聚合（分维度页学科 tab 专用，初中数学≠小学数学） */
 function aggByStageCourse(data){
@@ -2114,7 +2135,7 @@ function aggByStageCourse(data){
   }).sort(function(a,b){ return b.pv-a.pv; });
 }
 function aggByCategory(data){ var m={}; data.forEach(function(r){ if(r.aggLevel==='s') return; var k=mapModuleToCategory(r.module || ''); if(!k) return; if(!m[k]) m[k]={pv:0,uv:0,dl:0,pr:0,ct:0,useUsers:0}; m[k].pv+=r.pv||0; m[k].uv+=r.uv||0; m[k].dl+=r.download||0; m[k].pr+=r.preview||0; m[k].ct++; m[k].useUsers+=r.total_users||0; }); return Object.entries(m).map(function(e){ return {name:e[0],pv:e[1].pv,uv:e[1].uv,dl:e[1].dl,pr:e[1].pr,ct:e[1].ct,useUsers:e[1].useUsers}; }).sort(function(a,b){ return b.pv-a.pv; }); }
-function calcKPI(data){ var t=0; var pv=0,uv=0,dl=0,pr=0; data.forEach(function(r){ if(r.aggLevel==='s') return; t++; pv+=r.pv||0; uv+=r.uv||0; dl+=r.download||0; pr+=r.preview||0; }); return {total:t,pv:pv,uv:uv,dl:dl,pr:pr}; }
+function calcKPI(data){ var t=0; var pv=0,uv=0,dl=0,pr=0; data.forEach(function(r){ if(r.aggLevel==='s') return; t++; pv+=Number(r.pv)||0; uv+=Number(r.uv)||0; dl+=Number(r.download)||0; pr+=Number(r.preview)||0; }); return {total:t,pv:pv,uv:uv,dl:dl,pr:pr}; }
 function initChart(id){ if(typeof echarts==="undefined") return null; var dom=document.getElementById(id); if(!dom) return null; if(CH[id]){ CH[id].dispose(); delete CH[id]; } CH[id]=echarts.init(dom); return CH[id]; }
 function emptyBox(icon,title){ return '<div class="empty-box"><div class="icon">'+icon+'</div><div style="font-weight:600;color:var(--t);margin-bottom:4px">'+title+'</div><div>暂无数据</div></div>'; }
 
@@ -2795,24 +2816,33 @@ function buildContent(data){
 
   // ===== 资源明细页 =====
   h += '<div class="sec'+(CUR==='detail'?' on':'')+'" id="sec-detail">';
-  if(data.length>0){
-    h += '<div class="info">📋 资源使用明细（共 '+fmt(data.length)+' 条）</div>';
+  // 只保留明细级资源，过滤课程汇总等聚合行
+  var detailData = data.filter(function(r){ return r.aggLevel !== 's'; });
+  if(detailData.length>0){
+    h += '<div class="info">📋 资源使用明细（共 '+fmt(detailData.length)+' 条）</div>';
     h += '<input type="text" class="search-box" id="detail-search" placeholder="🔍 搜索资源标题..." oninput="filterDetail()">';
 
-    // 按业务板块（轻松学/精准练/模拟卷）分组展示资源明细
-    var categoryGroups = {};
-    data.forEach(function(r){
-      var cat = mapModuleToCategory(r.module || '') || '未分类';
-      if(!categoryGroups[cat]) categoryGroups[cat] = [];
-      categoryGroups[cat].push(r);
+    // 按业务板块分组展示资源明细（轻松学/精准练/模拟卷）
+    var plateGroups = {};
+    var uncatPlate = [];
+    detailData.forEach(function(r){
+      var plate = mapModuleToCategory(r.module);
+      if(plate){
+        if(!plateGroups[plate]) plateGroups[plate] = [];
+        plateGroups[plate].push(r);
+      } else {
+        uncatPlate.push(r);
+      }
     });
+    if(uncatPlate.length){
+      plateGroups['未分类'] = uncatPlate;
+    }
 
     // 按板块固定顺序排序
-    var catOrder = ['轻松学', '精准练', '模拟卷', '未分类'];
-    var catColors = {'轻松学':'#2563EB', '精准练':'#10B981', '模拟卷':'#F59E0B', '未分类':'#6366F1'};
-    var sortedCat = Object.keys(categoryGroups).sort(function(a,b){
-      var ia = catOrder.indexOf(a);
-      var ib = catOrder.indexOf(b);
+    var plateOrder = ['轻松学', '精准练', '模拟卷', '未分类'];
+    var sortedPlate = Object.keys(plateGroups).sort(function(a,b){
+      var ia = plateOrder.indexOf(a);
+      var ib = plateOrder.indexOf(b);
       if(ia === -1 && ib === -1) return a.localeCompare(b);
       if(ia === -1) return 1;
       if(ib === -1) return -1;
@@ -2820,16 +2850,21 @@ function buildContent(data){
     });
 
     var totalShown = 0;
-    var maxPerGroup = 50; // 每个板块最多显示50条
+    var maxPerGroup = 200; // 每个板块最多显示200条（原为50）
 
-    sortedCat.forEach(function(cat){
-      var groupData = categoryGroups[cat];
+    sortedPlate.forEach(function(plate){
+      var groupData = plateGroups[plate];
+      // 按PV从高到低排序，PV相同则按UV从高到低
+      groupData.sort(function(a,b){
+        return (b.pv || 0) - (a.pv || 0) || (b.uv || 0) - (a.uv || 0);
+      });
       if(!groupData || groupData.length === 0) return;
 
       // 板块分组标题
-      var catColor = catColors[cat] || '#6366F1';
-      h += '<div style="margin:12px 0 8px 0;padding:8px 12px;background:linear-gradient(90deg,'+catColor+'15,'+catColor+'05);border-left:4px solid '+catColor+';border-radius:4px;display:flex;align-items:center;justify-content:space-between;">';
-      h += '<span style="font-weight:600;color:'+catColor+';">📦 '+esc(cat)+' <span style="font-size:12px;font-weight:400;color:var(--t3);">('+fmt(groupData.length)+'条)</span></span>';
+      var catColors = {'轻松学':'#2563EB', '精准练':'#10B981', '模拟卷':'#F59E0B', '未分类':'#6366F1'};
+      var plateColor = catColors[plate] || '#6366F1';
+      h += '<div style="margin:12px 0 8px 0;padding:8px 12px;background:linear-gradient(90deg,'+plateColor+'15,'+plateColor+'05);border-left:4px solid '+plateColor+';border-radius:4px;display:flex;align-items:center;justify-content:space-between;">';
+      h += '<span style="font-weight:600;color:'+plateColor+';">📁 '+esc(plate)+' <span style="font-size:12px;font-weight:400;color:var(--t3);">('+fmt(groupData.length)+'条)</span></span>';
       h += '</div>';
 
       // 数据问题汇总（每个板块下）
@@ -2846,20 +2881,62 @@ function buildContent(data){
         h += '</div></div>';
       }
 
-      // 该板块下的资源表格
-      h += '<div class="tbl-wrap" style="margin-bottom:16px;"><table class="data-table thin detail-scene-table" data-category="'+esc(cat)+'"><thead><tr><th>资源标题</th><th>学段</th><th>学科</th><th>资源分类</th><th>年级</th><th>版本</th><th>下载用户</th><th>预览用户</th><th>视频用户</th><th>PV</th><th>UV</th></tr></thead><tbody>';
+      // 该板块下的资源表格（单表滚动 + sticky 表头，只保留一个横向滚动条）
+      var cols = [
+        {label:'资源ID', cls:'name', width:'120px', sortable:false},
+        {label:'资源标题', cls:'name', width:'280px', sortable:false},
+        {label:'学段', cls:'', width:'60px', sortable:false},
+        {label:'学科', cls:'', width:'60px', sortable:false},
+        {label:'模块', cls:'', width:'90px', sortable:false},
+        {label:'年级', cls:'', width:'70px', sortable:false},
+        {label:'版本', cls:'', width:'100px', sortable:false},
+        {label:'PV', cls:'num', width:'80px', sortable:true, key:'pv'},
+        {label:'UV', cls:'num', width:'80px', sortable:true, key:'uv'},
+        {label:'下载次数', cls:'num', width:'80px', sortable:true, key:'downloadCount'},
+        {label:'下载用户', cls:'num', width:'80px', sortable:true, key:'download'},
+        {label:'预览次数', cls:'num', width:'80px', sortable:true, key:'previewCount'},
+        {label:'预览用户', cls:'num', width:'80px', sortable:true, key:'preview'},
+        {label:'视频次数', cls:'num', width:'80px', sortable:true, key:'videoCount'},
+        {label:'视频用户', cls:'num', width:'80px', sortable:true, key:'video_users'},
+        {label:'付费转化用户', cls:'num', width:'100px', sortable:true, key:'paid_users'}
+      ];
+      h += '<div class="detail-wrap" data-plate="'+esc(plate)+'">';
+      h += '<table class="detail-table" data-plate="'+esc(plate)+'">';
+      h += '<thead><tr>';
+      cols.forEach(function(c){
+        var sortAttr = c.sortable ? ' data-sort-key="'+c.key+'" onclick="sortDetailTable(\''+esc(plate)+'\',\''+c.key+'\')"' : '';
+        h += '<th class="'+c.cls+(c.sortable?' sortable':'')+'" style="width:'+c.width+'"'+sortAttr+'>'+c.label+'</th>';
+      });
+      h += '</tr></thead><tbody>';
       groupData.slice(0, maxPerGroup).forEach(function(r){
-        h += '<tr><td style="max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(r.title)+'">'+esc(r.title||'-')+'</td><td>'+esc(r.stage||'-')+'</td><td><span class="tag tb">'+esc(r.course||'-')+'</span></td><td>'+esc(r.module||'-')+'</td><td>'+esc(r.grade||'-')+'</td><td>'+esc(r.version||'-')+'</td><td class="num">'+sv(r.download)+'</td><td class="num">'+sv(r.preview)+'</td><td class="num">'+sv(r.video_users||0)+'</td><td class="num">'+sv(r.pv,1)+'</td><td class="num">'+sv(r.uv,1)+'</td></tr>';
+        h += '<tr>';
+        h += '<td class="name" style="max-width:120px;" title="'+esc(r.resourceId)+'">'+esc(r.resourceId||'-')+'</td>';
+        h += '<td class="name" style="max-width:280px;" title="'+esc(r.title)+'">'+esc(r.title||'-')+'</td>';
+        h += '<td>'+esc(r.stage||'-')+'</td>';
+        h += '<td><span class="tag tb">'+esc(r.course||'-')+'</span></td>';
+        h += '<td>'+esc(r.module||'-')+'</td>';
+        h += '<td>'+esc(r.grade||'-')+'</td>';
+        h += '<td>'+esc(r.version||'-')+'</td>';
+        h += '<td class="num" data-sort="'+(r.pv||0)+'">'+sv(r.pv,1)+'</td>';
+        h += '<td class="num" data-sort="'+(r.uv||0)+'">'+sv(r.uv,1)+'</td>';
+        h += '<td class="num" data-sort="'+(r.downloadCount||0)+'">'+sv(r.downloadCount)+'</td>';
+        h += '<td class="num" data-sort="'+(r.download||0)+'">'+sv(r.download)+'</td>';
+        h += '<td class="num" data-sort="'+(r.previewCount||0)+'">'+sv(r.previewCount)+'</td>';
+        h += '<td class="num" data-sort="'+(r.preview||0)+'">'+sv(r.preview)+'</td>';
+        h += '<td class="num" data-sort="'+(r.videoCount||0)+'">'+sv(r.videoCount)+'</td>';
+        h += '<td class="num" data-sort="'+(r.video_users||0)+'">'+sv(r.video_users)+'</td>';
+        h += '<td class="num" data-sort="'+(r.paid_users||0)+'">'+sv(r.paid_users)+'</td>';
+        h += '</tr>';
       });
       h += '</tbody></table></div>';
       if(groupData.length > maxPerGroup){
-        h += '<div style="text-align:center;padding:6px;font-size:11px;color:var(--t3);margin-bottom:12px;">'+esc(cat)+' 显示前 '+maxPerGroup+' 条，共 '+fmt(groupData.length)+' 条</div>';
+        h += '<div style="text-align:center;padding:6px;font-size:11px;color:var(--t3);margin-bottom:12px;">'+esc(plate)+' 显示前 '+maxPerGroup+' 条，共 '+fmt(groupData.length)+' 条</div>';
       }
       totalShown += Math.min(groupData.length, maxPerGroup);
     });
 
-    if(totalShown < data.length){
-      h += '<div style="text-align:center;padding:10px;font-size:12px;color:var(--t3)">已显示 '+fmt(totalShown)+' 条，共 '+fmt(data.length)+' 条 | 使用筛选缩小范围</div>';
+    if(totalShown < detailData.length){
+      h += '<div style="text-align:center;padding:10px;font-size:12px;color:var(--t3)">已显示 '+fmt(totalShown)+' 条，共 '+fmt(detailData.length)+' 条 | 使用筛选缩小范围</div>';
     }
     h += '<div class="insight-box">';
     h += '<div class="insight-title">🤖 AI 智能分析<button class="nav-btn" onclick="generateDetailAIInsight()" style="margin-left:auto;font-size:12px">✨ 生成分析</button></div>';
@@ -5159,6 +5236,31 @@ function buildDimHint(tab){
   return '<div style="margin:0 0 12px 0;padding:10px 12px;background:#EFF6FF;border:1px solid #BFDBFE;border-radius:6px;color:#1E40AF;font-size:12px;line-height:1.6">' + lines.join('<br>') + '</div>';
 }
 
+function buildDimMissingTitle(label, uv, useUsers, paidUsers, metric){
+  if(metric === 'uv'){
+    return label + '：UV=' + (uv || 0) + '，缺少该维度去重聚合数据，无法计算UV';
+  }
+  if(metric === 'use_rate'){
+    if(uv === 0 || uv === null || uv === undefined){
+      return label + '：UV=' + (uv || 0) + '、使用用户=' + (useUsers || 0) + '，无法计算使用率';
+    }
+    if(useUsers === 0 || useUsers === null || useUsers === undefined){
+      return label + '：UV=' + (uv || 0) + '、使用用户=' + (useUsers || 0) + '，无法计算使用率';
+    }
+    return label + '：UV=' + (uv || 0) + '、使用用户=' + (useUsers || 0) + '，使用率=' + ((useUsers/uv*100).toFixed(2)) + '%';
+  }
+  if(metric === 'convert_rate'){
+    if(uv === 0 || uv === null || uv === undefined){
+      return label + '：UV=' + (uv || 0) + '、付费用户=' + (paidUsers || 0) + '，无法计算付费转化率';
+    }
+    if(paidUsers === 0 || paidUsers === null || paidUsers === undefined){
+      return label + '：UV=' + (uv || 0) + '、付费用户=' + (paidUsers || 0) + '，付费转化率为0%';
+    }
+    return label + '：UV=' + (uv || 0) + '、付费用户=' + (paidUsers || 0) + '，付费转化率=' + ((paidUsers/uv*100).toFixed(2)) + '%';
+  }
+  return label;
+}
+
 function buildDimContent(tab, data){
   // 判断当前是否处于 25-26春季期中（kp 数据覆盖的阶段）
   var currentPhase = (ACT['phase'] && ACT['phase'][0]) || '';
@@ -5187,6 +5289,9 @@ function buildDimContent(tab, data){
         uv: (kpUv !== null) ? kpUv : 0,
         uvMissing: (kpUv === null),
         use: 0, dl: 0, ct: c.ct,
+        useUsers: (kpUv !== null) ? (getKpMetric('course', c.name, 'use_users', currentPhase) || 0) : 0,
+        paidUsers: (kpUv !== null) ? (getKpMetric('course', c.name, 'paid_users', currentPhase) || 0) : 0,
+        label: c.name,
         // 直接展示源数据(kp 权威去重值)，不约分；渲染时由 fmtUseRate 统一2位小数
         useRate: kpUseRate,
         convertRate: kpConvertRate
@@ -5200,7 +5305,7 @@ function buildDimContent(tab, data){
     var courseScopeNote = courseScopeTxt ? '（学段+学科；含额外切片时去重指标为"数据不足"' + courseScopeTxt + '）' : '（学段+学科）';
 
     h += '<div class="row r2"><div class="box"><div class="box-hd"><span class="box-ttl">📐 学科 PV 排行</span></div><div class="chart" id="ch-dim-course-pv"></div></div><div class="box"><div class="box-hd"><span class="box-ttl">📐 学科使用率排行 <span style="font-size:11px;font-weight:400;color:var(--t3)">'+courseScopeNote+'</span></span></div><div class="chart" id="ch-dim-course-rate"></div></div></div>';
-    h += '<div class="box"><div class="box-hd"><span class="box-ttl">📋 学科明细 TOP15 <span style="font-size:11px;font-weight:400;color:var(--t3)">'+courseScopeNote+'</span></span></div><div class="tbl-wrap"><table class="data-table module-matrix-table"><thead><tr><th>学科</th><th>PV</th><th>UV</th><th>使用率</th><th>付费转化</th><th>下载</th><th>资源数</th><th>评价</th></tr></thead><tbody>';
+    h += '<div class="box"><div class="box-hd"><span class="box-ttl">📋 学科明细 TOP15 <span style="font-size:11px;font-weight:400;color:var(--t3)">'+courseScopeNote+'</span></span></div><div class="tbl-wrap"><table class="data-table module-matrix-table"><thead><tr><th style="width:18%">学科</th><th style="width:12%">PV</th><th style="width:12%">UV</th><th style="width:14%">使用率</th><th style="width:14%">付费转化</th><th style="width:10%">下载</th><th style="width:10%">资源数</th><th style="width:10%">评价</th></tr></thead><tbody>';
     cs.forEach(function(c){
       var m = courseMetrics[c.name];
       var evalTag = '';
@@ -5215,9 +5320,9 @@ function buildDimContent(tab, data){
 
       h += '<tr><td class="name">'+esc(c.name)+'</td>';
       h += '<td>'+sv(c.pv,1)+'</td>';
-      h += '<td>'+(m.uvMissing ? '<span style="color:var(--t3);font-size:12px" title="UV需按用户ID去重，该维度暂无聚合数据">数据不足</span>' : sv(m.uv,1))+'</td>';
-      h += '<td class="'+useRateClass+'">'+(m.useRate !== null ? fmtUseRate(m.useRate) : '<span style="color:var(--t3);font-size:12px">数据不足</span>')+'</td>';
-      h += '<td class="'+convertClass+'">'+(m.convertRate !== null ? fmtUseRate(m.convertRate) : '<span style="color:var(--t3);font-size:12px">数据不足</span>')+'</td>';
+      h += '<td>'+(m.uvMissing ? '<span style="color:var(--t3);font-size:12px" title="'+esc(buildDimMissingTitle(m.label, m.uv, m.useUsers, m.paidUsers, 'uv'))+'">数据不足</span>' : sv(m.uv,1))+'</td>';
+      h += '<td class="'+useRateClass+'">'+(m.useRate !== null ? fmtUseRate(m.useRate) : '<span style="color:var(--t3);font-size:12px" title="'+esc(buildDimMissingTitle(m.label, m.uv, m.useUsers, m.paidUsers, 'use_rate'))+'">数据不足</span>')+'</td>';
+      h += '<td class="'+convertClass+'">'+(m.convertRate !== null ? fmtUseRate(m.convertRate) : '<span style="color:var(--t3);font-size:12px" title="'+esc(buildDimMissingTitle(m.label, m.uv, m.useUsers, m.paidUsers, 'convert_rate'))+'">数据不足</span>')+'</td>';
       h += '<td>'+sv(m.dl)+'</td>';
       h += '<td>'+fmt(m.ct)+'</td>';
       h += '<td>'+evalTag+'</td></tr>';
@@ -5282,6 +5387,9 @@ function buildDimContent(tab, data){
         uvMissing: (gKpUv === null),
         dl: g.dl || 0,
         ct: (gKr.source === 'kp' && gKr.resource_count) ? gKr.resource_count : g.ct,
+        useUsers: gKpUse || 0,
+        paidUsers: gKpPaid || 0,
+        label: (activeStage ? activeStage : '') + (activeCourse ? activeCourse : '') + '-' + g.name,
         useRate: useRate !== null ? useRate : null,
         convertRate: convertRate !== null ? convertRate : null
       };
@@ -5300,16 +5408,16 @@ function buildDimContent(tab, data){
       gradeScopeTxt = '（未选学科：整体年级无权威去重聚合，UV/转化率显示"数据不足"）';
     }
     h += '<div class="row r2"><div class="box"><div class="box-hd"><span class="box-ttl">📅 年级 PV 分布</span></div><div class="chart" id="ch-dim-grade-pv"></div></div><div class="box"><div class="box-hd"><span class="box-ttl">📅 年级使用率分布 <span style="font-size:11px;font-weight:400;color:var(--t3)">'+gradeScopeTxt+'</span></span></div><div class="chart" id="ch-dim-grade-rate"></div></div></div>';
-    h += '<div class="box"><div class="box-hd"><span class="box-ttl">📋 年级明细 <span style="font-size:11px;font-weight:400;color:var(--t3)">'+gradeScopeTxt+'（含使用率/转化率）</span></span></div><div class="tbl-wrap"><table class="data-table module-matrix-table"><thead><tr><th>年级</th><th>PV</th><th>UV</th><th>使用率</th><th>付费转化</th><th>下载</th><th>资源数</th></tr></thead><tbody>';
+    h += '<div class="box"><div class="box-hd"><span class="box-ttl">📋 年级明细 <span style="font-size:11px;font-weight:400;color:var(--t3)">'+gradeScopeTxt+'（含使用率/转化率）</span></span></div><div class="tbl-wrap"><table class="data-table module-matrix-table"><thead><tr><th style="width:18%">年级</th><th style="width:14%">PV</th><th style="width:14%">UV</th><th style="width:14%">使用率</th><th style="width:14%">付费转化</th><th style="width:14%">下载</th><th style="width:12%">资源数</th></tr></thead><tbody>';
     gr.forEach(function(g){
       var m = gradeMetrics[g.name];
       var useRateClass = m.useRate >= 40 ? 'rate-high' : (m.useRate >= 20 ? 'rate-mid' : 'rate-low');
       var convertClass = m.convertRate >= 5 ? 'rate-high' : (m.convertRate >= 3 ? 'rate-mid' : 'rate-low');
       h += '<tr><td class="name">'+esc(g.name)+'</td>';
       h += '<td>'+sv(g.pv,1)+'</td>';
-      h += '<td>'+(m.uvMissing ? '<span style="color:var(--t3);font-size:12px" title="UV需按用户ID去重，该维度暂无聚合数据">数据不足</span>' : sv(m.uv,1))+'</td>';
-      h += '<td class="'+useRateClass+'">'+(m.useRate === null ? '<span style="color:var(--t3);font-size:12px">数据不足</span>' : fmtUseRate(m.useRate))+'</td>';
-      h += '<td class="'+convertClass+'">'+(m.convertRate === null ? '<span style="color:var(--t3);font-size:12px">数据不足</span>' : fmtUseRate(m.convertRate))+'</td>';
+      h += '<td>'+(m.uvMissing ? '<span style="color:var(--t3);font-size:12px" title="'+esc(buildDimMissingTitle(m.label, m.uv, m.useUsers, m.paidUsers, 'uv'))+'">数据不足</span>' : sv(m.uv,1))+'</td>';
+      h += '<td class="'+useRateClass+'">'+(m.useRate === null ? '<span style="color:var(--t3);font-size:12px" title="'+esc(buildDimMissingTitle(m.label, m.uv, m.useUsers, m.paidUsers, 'use_rate'))+'">数据不足</span>' : fmtUseRate(m.useRate))+'</td>';
+      h += '<td class="'+convertClass+'">'+(m.convertRate === null ? '<span style="color:var(--t3);font-size:12px" title="'+esc(buildDimMissingTitle(m.label, m.uv, m.useUsers, m.paidUsers, 'convert_rate'))+'">数据不足</span>' : fmtUseRate(m.convertRate))+'</td>';
       h += '<td>'+sv(m.dl)+'</td>';
       h += '<td>'+fmt(m.ct)+'</td></tr>';
     });
@@ -5372,6 +5480,9 @@ function buildDimContent(tab, data){
         uvMissing: (vKpUv === null),
         dl: v.dl || 0,
         ct: (vKr.source === 'kp' && vKr.resource_count) ? vKr.resource_count : v.ct,
+        useUsers: vKpUse || 0,
+        paidUsers: vKpPaid || 0,
+        label: (activeStage ? activeStage : '') + (activeCourse ? activeCourse : '') + '-' + v.name,
         useRate: useRate !== null ? useRate : null,
         convertRate: convertRate !== null ? convertRate : null
       };
@@ -5389,33 +5500,33 @@ function buildDimContent(tab, data){
       verScopeTxt = '（未选学科：整体版本无权威去重聚合，UV/转化率显示"数据不足"）';
     }
     h += '<div class="row r2"><div class="box"><div class="box-hd"><span class="box-ttl">📖 版本 PV TOP15</span></div><div class="chart" id="ch-dim-ver-pv"></div></div><div class="box"><div class="box-hd"><span class="box-ttl">📖 版本使用率 TOP15 <span style="font-size:11px;font-weight:400;color:var(--t3)">'+verScopeTxt+'</span></span></div><div class="chart" id="ch-dim-ver-rate"></div></div></div>';
-    h += '<div class="box"><div class="box-hd"><span class="box-ttl">📋 版本明细 TOP15 <span style="font-size:11px;font-weight:400;color:var(--t3)">'+verScopeTxt+'（含使用率/转化率）</span></span></div><div class="tbl-wrap"><table class="data-table module-matrix-table"><thead><tr><th>版本</th><th>PV</th><th>UV</th><th>使用率</th><th>付费转化</th><th>下载</th><th>资源数</th></tr></thead><tbody>';
+    h += '<div class="box"><div class="box-hd"><span class="box-ttl">📋 版本明细 TOP15 <span style="font-size:11px;font-weight:400;color:var(--t3)">'+verScopeTxt+'（含使用率/转化率）</span></span></div><div class="tbl-wrap"><table class="data-table module-matrix-table"><thead><tr><th style="width:18%">版本</th><th style="width:14%">PV</th><th style="width:14%">UV</th><th style="width:14%">使用率</th><th style="width:14%">付费转化</th><th style="width:14%">下载</th><th style="width:12%">资源数</th></tr></thead><tbody>';
     ver.forEach(function(v){
       var m = verMetrics[v.name];
       var useRateClass = m.useRate >= 40 ? 'rate-high' : (m.useRate >= 20 ? 'rate-mid' : 'rate-low');
       var convertClass = m.convertRate >= 5 ? 'rate-high' : (m.convertRate >= 3 ? 'rate-mid' : 'rate-low');
       h += '<tr><td class="name">'+esc(v.name)+'</td>';
       h += '<td>'+sv(v.pv,1)+'</td>';
-      h += '<td>'+(m.uvMissing ? '<span style="color:var(--t3);font-size:12px" title="UV需按用户ID去重，该维度暂无聚合数据">数据不足</span>' : sv(m.uv,1))+'</td>';
-      h += '<td class="'+useRateClass+'">'+(m.useRate === null ? '<span style="color:var(--t3);font-size:12px">数据不足</span>' : fmtUseRate(m.useRate))+'</td>';
-      h += '<td class="'+convertClass+'">'+(m.convertRate === null ? '<span style="color:var(--t3);font-size:12px">数据不足</span>' : fmtUseRate(m.convertRate))+'</td>';
+      h += '<td>'+(m.uvMissing ? '<span style="color:var(--t3);font-size:12px" title="'+esc(buildDimMissingTitle(m.label, m.uv, m.useUsers, m.paidUsers, 'uv'))+'">数据不足</span>' : sv(m.uv,1))+'</td>';
+      h += '<td class="'+useRateClass+'">'+(m.useRate === null ? '<span style="color:var(--t3);font-size:12px" title="'+esc(buildDimMissingTitle(m.label, m.uv, m.useUsers, m.paidUsers, 'use_rate'))+'">数据不足</span>' : fmtUseRate(m.useRate))+'</td>';
+      h += '<td class="'+convertClass+'">'+(m.convertRate === null ? '<span style="color:var(--t3);font-size:12px" title="'+esc(buildDimMissingTitle(m.label, m.uv, m.useUsers, m.paidUsers, 'convert_rate'))+'">数据不足</span>' : fmtUseRate(m.convertRate))+'</td>';
       h += '<td>'+sv(m.dl)+'</td>';
       h += '<td>'+fmt(m.ct)+'</td></tr>';
     });
     h += '</tbody></table></div></div>';
   } else if(tab==='module'){
-    var mod = aggBy(data,'module').filter(function(m){return m.name && m.name!=='阶段复习' && m.name!=='假期综合' && m.name!=='同步学习' && m.name!=='备考冲刺';});
-    // 计算每个模块的使用率和转化率
+    // 资源分类维度：按 talos / PDF / SRM题 / 视频 / HTML 聚合
+    var mod = aggByResourceType(data);
+    // 计算每个资源类型的使用率和转化率
     var modMetrics = {};
     mod.forEach(function(m){
-      var modData = data.filter(function(r){ return r.module === m.name; });
-      // ⚠️ 模块维度 kp 无聚合 → UV/使用率/付费转化 均显示"数据不足"，不用明细累加
-      modMetrics[m.name] = {pv:m.pv, uv:0, uvMissing:true, use:0, dl:0, ct:m.ct, useRate: calcUseRate(modData, {module: m.name}), convertRate: calcConvertRate(modData, {module: m.name})};
-      modData.forEach(function(r){ if(r.aggLevel==='s') return; modMetrics[m.name].dl += r.download||0; });
+      var typeData = data.filter(function(r){ return r.resourceType === m.name; });
+      modMetrics[m.name] = {pv:m.pv, uv:0, uvMissing:true, use:0, dl:0, ct:m.ct, useRate: calcUseRate(typeData, {resourceType: m.name}), convertRate: calcConvertRate(typeData, {resourceType: m.name})};
+      typeData.forEach(function(r){ if(r.aggLevel==='s') return; modMetrics[m.name].dl += r.download||0; });
     });
 
     h += '<div class="row r2"><div class="box"><div class="box-hd"><span class="box-ttl">📦 资源分类 PV 排行</span></div><div class="chart" id="ch-dim-mod-pv"></div></div><div class="box"><div class="box-hd"><span class="box-ttl">📦 资源分类使用率排行</span></div><div class="chart" id="ch-dim-mod-rate"></div></div></div>';
-    h += '<div class="box"><div class="box-hd"><span class="box-ttl">📋 模块使用率×转化率矩阵</span></div><div class="tbl-wrap"><table class="data-table module-matrix-table"><thead><tr><th>模块</th><th>使用率</th><th>付费转化</th><th>PV</th><th>UV</th><th>资源数</th><th>评价</th></tr></thead><tbody>';
+    h += '<div class="box"><div class="box-hd"><span class="box-ttl">📋 资源分类使用率×转化率矩阵</span></div><div class="tbl-wrap"><table class="data-table module-matrix-table"><thead><tr><th style="width:18%">资源分类</th><th style="width:14%">使用率</th><th style="width:14%">付费转化</th><th style="width:14%">PV</th><th style="width:14%">UV</th><th style="width:12%">资源数</th><th style="width:14%">评价</th></tr></thead><tbody>';
     mod.forEach(function(m){
       var mm = modMetrics[m.name];
       var evalText = '';
@@ -5433,25 +5544,38 @@ function buildDimContent(tab, data){
       h += '<td class="'+useRateClass+'">'+fmtPctOrDash(mm.useRate)+'</td>';
       h += '<td class="'+convertClass+'">'+fmtPctOrDash(mm.convertRate)+'</td>';
       h += '<td>'+sv(m.pv,1)+'</td>';
-      h += '<td>'+(mm.uvMissing ? '<span style="color:var(--t3);font-size:12px" title="UV需按用户ID去重，模块维度暂无聚合数据">数据不足</span>' : sv(mm.uv,1))+'</td>';
-      h += '<td>'+fmt(mm.ct)+'</td>';
+      h += '<td>'+(mm.uvMissing ? '<span style="color:var(--t3);font-size:12px" title="UV需按用户ID去重，资源分类维度暂无聚合数据">数据不足</span>' : sv(mm.uv,1))+'</td>';
+      h += '<td>'+fmt(m.ct)+'</td>';
       h += '<td>'+evalTag+'</td></tr>';
     });
     h += '</tbody></table></div></div>';
   } else if(tab==='category'){
     var catData = aggByCategory(data);
+
+    // 板块 UV/使用率/转化率 必须和当前筛选条件同口径；
+    // kp 中板块聚合只有「场景-板块（XX）」全局切片，没有学段×学科×板块等交叉聚合。
+    // 当用户选了学段/学科/年级/版本时，若仍套用全局板块 UV，会出现 PV < UV 等口径错误。
+    var activeCourse = (ACT['course'] && ACT['course'][0]) || '';
+    var activeStage = (ACT['stage'] && ACT['stage'][0]) || '';
+    var activeGrade = (ACT['grade'] && ACT['grade'][0]) || '';
+    var activeVersion = (ACT['version'] && ACT['version'][0]) || '';
+    var hasCrossFilter = !!(activeCourse || activeStage || activeGrade || activeVersion);
+    var catScopeNote = hasCrossFilter
+      ? '（板块 UV/使用率/转化率 无当前筛选条件下的交叉聚合，显示"数据不足"）'
+      : '（板块 UV 来自阶段总览去重聚合）';
+
     // 计算每个板块的使用率和转化率
     var catMetrics = {};
     catData.forEach(function(c){
       var categoryData = data.filter(function(r){ return mapModuleToCategory(r.module || '') === c.name; });
-      var kpUv = getKpUv('category', c.name);   // UV 去重：查 kp「场景-板块」，无则 null
-      catMetrics[c.name] = {pv:c.pv, uv:kpUv !== null ? kpUv : 0, uvMissing:(kpUv === null), use:0, dl:0, ct:c.ct, useRate: calcUseRate(categoryData, {category: c.name}), convertRate: calcConvertRate(categoryData, {category: c.name})};
+      var kpUv = hasCrossFilter ? null : getKpUv('category', c.name);   // 有交叉筛选时禁止套用全局板块 UV
+      catMetrics[c.name] = {pv:c.pv, uv:kpUv !== null ? kpUv : 0, uvMissing:(kpUv === null), use:0, dl:0, ct:c.ct, useRate: hasCrossFilter ? null : calcUseRate(categoryData, {category: c.name}), convertRate: hasCrossFilter ? null : calcConvertRate(categoryData, {category: c.name})};
       categoryData.forEach(function(r){ if(r.aggLevel==='s') return; catMetrics[c.name].dl += r.download||0; });
     });
 
     var catColors = {'轻松学':'#2563EB', '精准练':'#10B981', '模拟卷':'#F59E0B'};
     h += '<div class="row r2"><div class="box"><div class="box-hd"><span class="box-ttl">📦 板块 PV 排行</span></div><div class="chart" id="ch-dim-cat-pv"></div></div><div class="box"><div class="box-hd"><span class="box-ttl">📦 板块使用率排行</span></div><div class="chart" id="ch-dim-cat-rate"></div></div></div>';
-    h += '<div class="box"><div class="box-hd"><span class="box-ttl">📋 板块明细（轻松学 / 精准练 / 模拟卷）</span></div><div class="tbl-wrap"><table class="data-table module-matrix-table"><thead><tr><th>板块</th><th>PV</th><th>UV</th><th>使用率</th><th>付费转化</th><th>下载</th><th>资源数</th><th>评价</th></tr></thead><tbody>';
+    h += '<div class="box"><div class="box-hd"><span class="box-ttl">📋 板块明细（轻松学 / 精准练 / 模拟卷）<span style="font-size:11px;font-weight:400;color:var(--t3)">'+catScopeNote+'</span></span></div><div class="tbl-wrap"><table class="data-table module-matrix-table"><thead><tr><th style="width:18%">板块</th><th style="width:12%">PV</th><th style="width:12%">UV</th><th style="width:14%">使用率</th><th style="width:14%">付费转化</th><th style="width:10%">下载</th><th style="width:10%">资源数</th><th style="width:10%">评价</th></tr></thead><tbody>';
     catData.forEach(function(c){
       var m = catMetrics[c.name];
       var evalTag = '';
@@ -5478,29 +5602,85 @@ function buildDimContent(tab, data){
   return h;
 }
 
+function sortDetailTable(plate, key){
+  // 找到对应板块的表格
+  var table = document.querySelector('.detail-table[data-plate="'+esc(plate)+'"]');
+  if(!table) return;
+
+  var ths = table.querySelectorAll('thead th');
+  var tbody = table.querySelector('tbody');
+  var rows = Array.from(tbody.querySelectorAll('tr'));
+
+  // 找到当前点击列的索引
+  var colIndex = -1;
+  var currentKey = null;
+  ths.forEach(function(th, idx){
+    if(th.getAttribute('data-sort-key') === key){
+      colIndex = idx;
+    }
+    // 记录已存在的排序状态
+    if(th.classList.contains('sort-asc') || th.classList.contains('sort-desc')){
+      currentKey = th.getAttribute('data-sort-key');
+    }
+  });
+  if(colIndex < 0) return;
+
+  // 确定排序方向：点击同列切换升/降，点击新列默认降序
+  var isSame = currentKey === key;
+  var thClicked = ths[colIndex];
+  var wantDesc = true;
+  if(isSame){
+    wantDesc = !thClicked.classList.contains('sort-desc');
+  }
+
+  // 清除所有表头排序状态
+  ths.forEach(function(th){
+    th.classList.remove('sort-asc','sort-desc');
+  });
+  thClicked.classList.add(wantDesc ? 'sort-desc' : 'sort-asc');
+
+  // 按该列 data-sort 数值排序
+  rows.sort(function(a,b){
+    var aTd = a.cells[colIndex];
+    var bTd = b.cells[colIndex];
+    var aVal = parseFloat(aTd ? aTd.getAttribute('data-sort') : 0) || 0;
+    var bVal = parseFloat(bTd ? bTd.getAttribute('data-sort') : 0) || 0;
+    return wantDesc ? (bVal - aVal) : (aVal - bVal);
+  });
+
+  // 重新插入（排序后保持原有的 top 200 条限制）
+  rows.forEach(function(row){ tbody.appendChild(row); });
+}
+
 function filterDetail(){
   var kw = document.getElementById('detail-search').value.toLowerCase();
-  // 支持按场景分组后的多个表格
-  var tables = document.querySelectorAll('.detail-scene-table');
+  // 支持按板块分组后的多个表格（搜索资源ID或资源标题）
+  var tables = document.querySelectorAll('.detail-table');
   tables.forEach(function(table){
     var rows = table.querySelectorAll('tbody tr');
     var hasVisible = false;
     rows.forEach(function(row){
-      var match = row.cells[0].textContent.toLowerCase().indexOf(kw)>=0;
+      // 资源ID在cells[0]，资源标题在cells[1]
+      var rid = row.cells[0] ? row.cells[0].textContent.toLowerCase() : '';
+      var title = row.cells[1] ? row.cells[1].textContent.toLowerCase() : '';
+      var match = rid.indexOf(kw)>=0 || title.indexOf(kw)>=0;
       row.style.display = match?'':'none';
       if(match) hasVisible = true;
     });
-    // 如果没有匹配的行，隐藏整个场景分组
-    var sceneHeader = table.previousElementSibling;
-    if(sceneHeader && sceneHeader.style && sceneHeader.style.background){
-      sceneHeader.style.display = hasVisible?'':'none';
-    }
-    table.style.display = hasVisible?'':'none';
-    // 隐藏"显示前X条"提示
-    var nextEl = table.nextElementSibling;
+    // 控制明细表格容器及其兄弟提示的显示
+    var wrap = table.closest('.detail-wrap');
+    if(wrap) wrap.style.display = hasVisible?'':'none';
+    // 隐藏"显示前X条"提示（紧跟在 detail-wrap 后面的 div）
+    var nextEl = wrap ? wrap.nextElementSibling : null;
     if(nextEl && nextEl.textContent && nextEl.textContent.indexOf('显示前')>=0){
       nextEl.style.display = hasVisible?'':'none';
     }
+    // 如果没有匹配的行，隐藏整个板块分组（标题在 wrap 之前的兄弟 div）
+    var header = wrap ? wrap.previousElementSibling : null;
+    while(header && header.style && !header.style.background){
+      header = header.previousElementSibling;
+    }
+    if(header && header.style) header.style.display = hasVisible?'':'none';
   });
 }
 
@@ -5521,7 +5701,7 @@ function rOverview(){
   var ps=D.ps||{}, psKeys=Object.keys(ps).sort();
   var st=aggBy(data,'stage').filter(function(s){return s.name && s.name!=='未知' && s.name!=='nan';});
   var cs=aggBy(data,'course').slice(0,10);
-  var mod=aggBy(data,'module').filter(function(m){return m.name && m.name!=='未知' && m.name!=='nan' && m.name!=='阶段复习';});
+  var mod = aggByResourceType(data);
 
   // 各阶段对比图（PV/UV）
   // ⚠️ 取数铁律：UV 是去重指标，必须取 kp 各阶段总览聚合(getPhaseKpiOverall→kp)，
@@ -5691,18 +5871,17 @@ function rDimension(){
     var c2=initChart('ch-dim-ver-rate');
     if(c2 && sortedByRate.length>0) c2.setOption({tooltip:{trigger:'axis',formatter:function(p){return p[0].name + '<br/>使用率: ' + fmtUseRate(p[0].value);}},grid:{left:100,right:20,top:10,bottom:20},xAxis:{type:'value',max:100,axisLabel:{fontSize:11,formatter:function(v){return v+'%';}}},yAxis:{type:'category',data:sortedByRate.map(function(v){return v.name;}).reverse(),axisLabel:{fontSize:10},inverse:true},series:[{type:'bar',data:sortedByRate.map(function(v){return verMetrics[v.name].useRate;}).reverse(),itemStyle:{color:'#10B981',borderRadius:[0,4,4,0]},barWidth:16}]});
   } else if(CUR_DIM_TAB==='module'){
-    var mod=aggBy(data,'module').filter(function(m){return m.name && m.name!=='阶段复习' && m.name!=='假期综合' && m.name!=='同步学习' && m.name!=='备考冲刺';});
-    var c1=initChart('ch-dim-mod-pv');
+    var mod = aggByResourceType(data);
+    var c1 = initChart('ch-dim-mod-pv');
     if(c1 && mod.length>0) c1.setOption({tooltip:{trigger:'axis'},grid:{left:90,right:20,top:10,bottom:20},xAxis:{type:'value',axisLabel:{fontSize:11,formatter:function(v){return sv(v,0);}}},yAxis:{type:'category',data:mod.map(function(m){return m.name;}).reverse(),axisLabel:{fontSize:10},inverse:true},series:[{type:'bar',data:mod.map(function(m){return m.pv;}).reverse(),itemStyle:{color:'#F59E0B',borderRadius:[0,4,4,0]},barWidth:16}]});
 
-    // 模块使用率图表：模块维度 kp 无聚合 → useRate 恒为 null，不渲染 0% 柱状图
     var modMetrics = {};
     mod.forEach(function(m){
-      var modData = data.filter(function(r){ return r.module === m.name; });
-      modMetrics[m.name] = {useRate: calcUseRate(modData, {module: m.name})}; // 恒 null
+      var typeData = data.filter(function(r){ return r.resourceType === m.name; });
+      modMetrics[m.name] = {useRate: calcUseRate(typeData, {resourceType: m.name})};
     });
     var sortedByRate = mod.slice().filter(function(m){ return modMetrics[m.name].useRate !== null; }).sort(function(a,b){ return modMetrics[b.name].useRate - modMetrics[a.name].useRate; });
-    var c2=initChart('ch-dim-mod-rate');
+    var c2 = initChart('ch-dim-mod-rate');
     if(c2 && sortedByRate.length>0) c2.setOption({tooltip:{trigger:'axis',formatter:function(p){return p[0].name + '<br/>使用率: ' + fmtUseRate(p[0].value);}},grid:{left:90,right:20,top:10,bottom:20},xAxis:{type:'value',max:100,axisLabel:{fontSize:11,formatter:function(v){return v+'%';}}},yAxis:{type:'category',data:sortedByRate.map(function(m){return m.name;}).reverse(),axisLabel:{fontSize:10},inverse:true},series:[{type:'bar',data:sortedByRate.map(function(m){return modMetrics[m.name].useRate;}).reverse(),itemStyle:{color:'#10B981',borderRadius:[0,4,4,0]},barWidth:16}]});
   } else if(CUR_DIM_TAB==='category'){
     var cat = aggByCategory(data);
