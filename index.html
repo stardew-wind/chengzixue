@@ -185,6 +185,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Noto Sans SC',sans
 
 </style>
 </head>
+
+<!-- Dimension chart IDs: ch-dim-course-pv ch-dim-course-uv ch-dim-course-use_users ch-dim-course-paid_users ch-dim-course-use_rate ch-dim-course-convert_rate; ch-dim-grade-pv ch-dim-grade-uv ch-dim-grade-use_users ch-dim-grade-paid_users ch-dim-grade-use_rate ch-dim-grade-convert_rate; ch-dim-ver-pv ch-dim-ver-uv ch-dim-ver-use_users ch-dim-ver-paid_users ch-dim-ver-use_rate ch-dim-ver-convert_rate; ch-dim-cat-pv ch-dim-cat-uv ch-dim-cat-use_users ch-dim-cat-paid_users ch-dim-cat-use_rate ch-dim-cat-convert_rate -->
 <body>
 
 <header class="hdr">
@@ -2157,21 +2159,34 @@ function getStageCourseKpData(){
   names.forEach(function(n){
     var pv = getKpMetric('course', n, 'pv', phase);
     if(pv === null || pv === 0) return;
+    var _uv = getKpMetric('course', n, 'uv', phase);
+    var _use = getKpMetric('course', n, 'use_users', phase);
+    var _paid = getKpMetric('course', n, 'paid_users', phase);
     result.push({
       name: n,
       stage: n.slice(0,2),
       course: n.slice(2),
       pv: pv,
-      uv: getKpMetric('course', n, 'uv', phase) || 0,
-      use_users: getKpMetric('course', n, 'use_users', phase) || 0,
-      paid_users: getKpMetric('course', n, 'paid_users', phase) || 0
+      uv: _uv || 0,
+      use_users: _use || 0,
+      paid_users: _paid || 0,
+      use_rate: safeUseRate(_use, _uv),
+      convert_rate: safeConvertRateFromUv(_paid, _uv)
     });
   });
   return result.sort(function(a,b){ return b.pv - a.pv; });
 }
 
-/** 学段学科排序模式（'pv'|'uv'|'use_users'|'paid_users'） */
-var COURSE_SORT_MODE = 'pv';
+/** 学段学科指标切换 */
+var COURSE_METRIC = 'pv';
+var COURSE_METRIC_DEFS = {
+  pv: {label:'PV', color:'#2563EB', rate:false},
+  uv: {label:'UV', color:'#06B6D4', rate:false},
+  use_users: {label:'使用人数', color:'#10B981', rate:false},
+  paid_users: {label:'付费人数', color:'#F59E0B', rate:false},
+  use_rate: {label:'使用率', color:'#10B981', rate:true},
+  convert_rate: {label:'付费转化率', color:'#F59E0B', rate:true}
+};
 function sortCourseData(data, mode){
   mode = mode || 'pv';
   return data.slice().sort(function(a,b){ return (b[mode]||0) - (a[mode]||0); });
@@ -2748,18 +2763,21 @@ function buildContent(data){
 
   h += '<div class="row r2"><div class="box"><div class="box-hd"><span class="box-ttl">📊 各阶段 PV/UV <span style="font-size:11px;font-weight:400;color:var(--t3)">(UV 为数仓去重值，无聚合则显示"数据不足")</span></span></div><div class="chart" id="ch-ov-phase"></div></div><div class="box"><div class="box-hd"><span class="box-ttl">🏫 学段 PV 分布</span></div><div class="chart" id="ch-ov-stage"></div></div></div>';
 
-  // 学段学科分布图（PV/UV/使用人数/付费人数 四维，数据来自 kp 聚合）
-  h += '<div class="row r1"><div class="box"><div class="box-hd"><span class="box-ttl">📐 学段学科 TOP10</span><span class="box-sub" style="display:flex;align-items:center;gap:6px">排序: <select id="course-sort-mode" onchange="changeCourseSort(this.value)" style="padding:2px 6px;border:1px solid var(--b);border-radius:4px;font-size:12px;background:var(--w);cursor:pointer"><option value="pv">PV</option><option value="uv">UV</option><option value="use_users">使用人数</option><option value="paid_users">付费人数</option></select><span style="color:var(--t3);font-weight:400">（数据来自 kp 聚合）</span></span></div><div class="chart tall" id="ch-ov-course"></div></div></div>';
-
-  // 四个独立指标 TOP10 图表
-  h += '<div class="row r2">';
-  h += '<div class="box"><div class="box-hd"><span class="box-ttl">📊 学段学科 PV TOP10</span></div><div class="chart" id="ch-ov-pv"></div></div>';
-  h += '<div class="box"><div class="box-hd"><span class="box-ttl">👥 学段学科 UV TOP10</span></div><div class="chart" id="ch-ov-uv"></div></div>';
-  h += '</div>';
-  h += '<div class="row r2">';
-  h += '<div class="box"><div class="box-hd"><span class="box-ttl">🙋 学段学科 使用人数 TOP10</span></div><div class="chart" id="ch-ov-use"></div></div>';
-  h += '<div class="box"><div class="box-hd"><span class="box-ttl">💰 学段学科 付费人数 TOP10</span></div><div class="chart" id="ch-ov-paid"></div></div>';
-  h += '</div>';
+  // 学段学科合并图：全部项目，点击指标切换
+  var _cmDef = COURSE_METRIC_DEFS[COURSE_METRIC] || COURSE_METRIC_DEFS.pv;
+  var _cmRows = getStageCourseKpData();
+  if(_cmDef.rate){
+    _cmRows = _cmRows.filter(function(d){ return d[COURSE_METRIC] !== null && !isNaN(d[COURSE_METRIC]); });
+  }
+  var _cmH = Math.max(360, Math.min(760, _cmRows.length * 26 + 90));
+  h += '<div class="row r1"><div class="box"><div class="box-hd"><span class="box-ttl"> 学段学科指标对比（全部 '+_cmRows.length+' 项）</span>';
+  h += '<span class="box-sub" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">指标: ';
+  Object.keys(COURSE_METRIC_DEFS).forEach(function(k){
+    var d = COURSE_METRIC_DEFS[k], active = k === COURSE_METRIC;
+    h += '<button onclick="switchCourseMetric(\''+k+'\')" style="padding:3px 10px;border-radius:4px;font-size:12px;cursor:pointer;border:1px solid '+(active?'var(--blue)':'var(--b)')+';background:'+(active?'var(--blue)':'var(--s)')+';color:'+(active?'#fff':'var(--t2)')+'">'+d.label+'</button>';
+  });
+  h += '<span style="color:var(--t3);font-weight:400">（数据来自 kp 聚合，按当前指标降序）</span></span></div>';
+  h += '<div class="chart" id="ch-ov-metric" style="height:'+_cmH+'px"></div></div></div>';
 
   // 学科洞察
   var courseInsight = analyzeCourseInsight(data);
@@ -2831,11 +2849,11 @@ function buildContent(data){
 
   // ===== 分维度页 =====
   h += '<div class="sec'+(CUR==='dimension'?' on':'')+'" id="sec-dimension">';
-  h += '<div class="info">📐 学科 × 年级 × 版本 × 资源分类 × 板块 五维拆解</div>';
+  h += '<div class="info">📐 学段学科 × 年级 × 版本 × 资源分类 × 板块 五维拆解</div>';
   // 维度Tab + 同比Tab：根据当前状态 CUR_DIM_TAB / DIM_YOY_MODE 设置 active，避免应用筛选后重置
   var _dimTabIdx = {course:0, grade:1, version:2, module:3, category:4};
   var _curDimIdx = _dimTabIdx[CUR_DIM_TAB] || 0;
-  h += '<div class="tab-bar" id="dim-main-tabs"><button class="tab-btn'+(_curDimIdx===0?' on':'')+'" onclick="showDimTab(\'course\')">学科</button><button class="tab-btn'+(_curDimIdx===1?' on':'')+'" onclick="showDimTab(\'grade\')">年级</button><button class="tab-btn'+(_curDimIdx===2?' on':'')+'" onclick="showDimTab(\'version\')">版本</button><button class="tab-btn'+(_curDimIdx===3?' on':'')+'" onclick="showDimTab(\'module\')">资源分类</button><button class="tab-btn'+(_curDimIdx===4?' on':'')+'" onclick="showDimTab(\'category\')">板块</button></div>';
+  h += '<div class="tab-bar" id="dim-main-tabs"><button class="tab-btn'+(_curDimIdx===0?' on':'')+'" onclick="showDimTab(\'course\')">学段学科</button><button class="tab-btn'+(_curDimIdx===1?' on':'')+'" onclick="showDimTab(\'grade\')">年级</button><button class="tab-btn'+(_curDimIdx===2?' on':'')+'" onclick="showDimTab(\'version\')">版本</button><button class="tab-btn'+(_curDimIdx===3?' on':'')+'" onclick="showDimTab(\'module\')">资源分类</button><button class="tab-btn'+(_curDimIdx===4?' on':'')+'" onclick="showDimTab(\'category\')">板块</button></div>';
   // 同比子Tab（始终显示，不再依赖D.y数据）
   h += '<div class="tab-bar" id="dim-yoy-tabs" style="margin-top:-8px;margin-bottom:16px;border-bottom:none;"><button class="tab-btn'+(!DIM_YOY_MODE?' on':'')+'" onclick="showDimYoyTab(false)" style="font-size:12px;padding:6px 12px;">📊 本期数据</button><button class="tab-btn'+(DIM_YOY_MODE?' on':'')+'" onclick="showDimYoyTab(true)" style="font-size:12px;padding:6px 12px;">📈 时间对比</button></div>';
   var dimInitialContent = DIM_YOY_MODE ? buildDimYoyContent(CUR_DIM_TAB || 'course', data) : buildDimContent(CUR_DIM_TAB || 'course', data);
@@ -5315,6 +5333,30 @@ function dimTh(label, note){
   return label + '<br><span style="font-size:11px;font-weight:400;color:var(--t3)">' + note + '</span>';
 }
 
+// 构建资源分类统一指标：表格与六张图必须共用此口径。
+// PV/下载/资源数可由明细聚合；UV/使用人数/付费人数只能来自精确模块KP，禁止明细累加。
+function getModuleMetricRows(data){
+  var base = aggByResourceType(data);
+  return base.map(function(m){
+    var kpUv = getKpMetric('module', m.name, 'uv');
+    var kpUse = getKpMetric('module', m.name, 'use_users');
+    var kpPaid = getKpMetric('module', m.name, 'paid_users');
+    var kpUseRate = getKpMetric('module', m.name, 'use_rate');
+    var kpConvert = getKpMetric('module', m.name, 'convert_rate');
+    var uv = kpUv === null ? null : kpUv;
+    var useUsers = kpUse === null ? null : kpUse;
+    var paidUsers = kpPaid === null ? null : kpPaid;
+    var useRate = kpUseRate !== null ? kpUseRate : (uv !== null && useUsers !== null ? safeUseRate(useUsers, uv) : null);
+    var convertRate = kpConvert !== null ? kpConvert : (uv !== null && paidUsers !== null ? safeConvertRateFromUv(paidUsers, uv) : null);
+    var typeData = data.filter(function(r){ return r.resourceType === m.name; });
+    var dl = 0;
+    typeData.forEach(function(r){ if(r.aggLevel !== 's') dl += r.download || 0; });
+    return {name:m.name, pv:m.pv, uv:uv, use_users:useUsers, paid_users:paidUsers,
+      use_rate:useRate, convert_rate:convertRate, dl:dl, ct:m.ct,
+      uvMissing:uv === null, useUsersMissing:useUsers === null, paidUsersMissing:paidUsers === null};
+  });
+}
+
 function buildDimContent(tab, data){
   // 判断当前是否处于 25-26春季期中（kp 数据覆盖的阶段）
   var currentPhase = (ACT['phase'] && ACT['phase'][0]) || '';
@@ -5336,6 +5378,8 @@ function buildDimContent(tab, data){
       // PV/UV/使用率/付费转化 全部走 kp（按 学段学科 精确匹配）
       var kpPv = !hasExtraSlice ? getKpMetric('course', c.name, 'pv', currentPhase) : null;
       var kpUv = !hasExtraSlice ? getKpMetric('course', c.name, 'uv', currentPhase) : null;
+      var kpUse = !hasExtraSlice ? getKpMetric('course', c.name, 'use_users', currentPhase) : null;
+      var kpPaid = !hasExtraSlice ? getKpMetric('course', c.name, 'paid_users', currentPhase) : null;
       var kpUseRate = !hasExtraSlice ? getKpMetric('course', c.name, 'use_rate', currentPhase) : null;
       var kpConvertRate = !hasExtraSlice ? getKpMetric('course', c.name, 'convert_rate', currentPhase) : null;
       courseMetrics[c.name] = {
@@ -5343,8 +5387,10 @@ function buildDimContent(tab, data){
         uv: (kpUv !== null) ? kpUv : 0,
         uvMissing: (kpUv === null),
         use: 0, dl: 0, ct: c.ct,
-        useUsers: (kpUv !== null) ? (getKpMetric('course', c.name, 'use_users', currentPhase) || 0) : 0,
-        paidUsers: (kpUv !== null) ? (getKpMetric('course', c.name, 'paid_users', currentPhase) || 0) : 0,
+        useUsers: kpUse,
+        paidUsers: kpPaid,
+        useUsersMissing: kpUse === null,
+        paidUsersMissing: kpPaid === null,
         label: c.name,
         // 直接展示源数据(kp 权威去重值)，不约分；渲染时由 fmtUseRate 统一2位小数
         useRate: kpUseRate,
@@ -5358,8 +5404,8 @@ function buildDimContent(tab, data){
     if(activeVersion) courseScopeTxt += ' · 版本=' + activeVersion;
     var courseScopeNote = courseScopeTxt ? '（学段+学科；含额外切片时去重指标为"数据不足"' + courseScopeTxt + '）' : '（学段+学科）';
 
-    h += '<div class="row r2"><div class="box"><div class="box-hd"><span class="box-ttl">📐 学科 PV 排行</span></div><div class="chart" id="ch-dim-course-pv"></div></div><div class="box"><div class="box-hd"><span class="box-ttl">📐 学科使用率排行 <span style="font-size:11px;font-weight:400;color:var(--t3)">'+courseScopeNote+'</span></span></div><div class="chart" id="ch-dim-course-rate"></div></div></div>';
-    h += '<div class="box"><div class="box-hd"><span class="box-ttl">📋 学科明细 TOP15 <span style="font-size:11px;font-weight:400;color:var(--t3)">'+courseScopeNote+'</span></span></div><div class="tbl-wrap"><table class="data-table module-matrix-table"><thead><tr><th style="width:18%">📐 学科</th><th style="width:12%">' + dimTh('PV', DIM_TH_NOTE.pv) + '</th><th style="width:12%">' + dimTh('UV', DIM_TH_NOTE.uv) + '</th><th style="width:14%">' + dimTh('使用率', DIM_TH_NOTE.useRate) + '</th><th style="width:14%">' + dimTh('付费转化', DIM_TH_NOTE.convertRate) + '</th><th style="width:10%">' + dimTh('下载', DIM_TH_NOTE.dl) + '</th><th style="width:10%">' + dimTh('资源数', DIM_TH_NOTE.ct) + '</th><th style="width:10%">' + dimTh('评价', DIM_TH_NOTE.eval) + '</th></tr></thead><tbody>';
+    h += buildDimMetricCharts('course', '📐 学段学科');
+    h += '<div class="box"><div class="box-hd"><span class="box-ttl">📋 学段学科明细 TOP15 <span style="font-size:11px;font-weight:400;color:var(--t3)">'+courseScopeNote+'</span></span></div><div class="tbl-wrap"><table class="data-table module-matrix-table"><thead><tr><th style="width:18%">📐 学段学科</th><th style="width:12%">' + dimTh('PV', DIM_TH_NOTE.pv) + '</th><th style="width:12%">' + dimTh('UV', DIM_TH_NOTE.uv) + '</th><th style="width:11%">' + dimTh('使用人数','去重使用用户数') + '</th><th style="width:11%">' + dimTh('付费人数','去重付费用户数') + '</th><th style="width:12%">' + dimTh('使用率', DIM_TH_NOTE.useRate) + '</th><th style="width:14%">' + dimTh('付费转化', DIM_TH_NOTE.convertRate) + '</th><th style="width:10%">' + dimTh('下载', DIM_TH_NOTE.dl) + '</th><th style="width:10%">' + dimTh('资源数', DIM_TH_NOTE.ct) + '</th><th style="width:10%">' + dimTh('评价', DIM_TH_NOTE.eval) + '</th></tr></thead><tbody>';
     cs.forEach(function(c){
       var m = courseMetrics[c.name];
       var evalTag = '';
@@ -5372,9 +5418,11 @@ function buildDimContent(tab, data){
       var useRateClass = m.useRate !== null && m.useRate >= 40 ? 'rate-high' : (m.useRate !== null && m.useRate >= 20 ? 'rate-mid' : 'rate-low');
       var convertClass = m.convertRate !== null && m.convertRate >= 5 ? 'rate-high' : (m.convertRate !== null && m.convertRate >= 3 ? 'rate-mid' : 'rate-low');
 
-      h += '<tr><td class="name">📐 '+esc(c.name)+'</td>';
-      h += '<td>'+sv(c.pv,1)+'</td>';
+      h += '<tr><td class="name">📐 学段学科 '+esc(c.name)+'</td>';
+      h += '<td>'+sv(m.pv,1)+'</td>';
       h += '<td>'+(m.uvMissing ? '<span style="color:var(--t3);font-size:12px" title="'+esc(buildDimMissingTitle(m.label, m.uv, m.useUsers, m.paidUsers, 'uv'))+'">--</span>' : sv(m.uv,1))+'</td>';
+      h += '<td>'+((m.useUsers === null || m.useUsersMissing) ? '<span style="color:var(--t3);font-size:12px">--</span>' : sv(m.useUsers,1))+'</td>';
+      h += '<td>'+((m.paidUsers === null || m.paidUsersMissing) ? '<span style="color:var(--t3);font-size:12px">--</span>' : sv(m.paidUsers,1))+'</td>';
       h += '<td class="'+useRateClass+'">'+(m.useRate !== null ? fmtUseRate(m.useRate) : '<span style="color:var(--t3);font-size:12px" title="'+esc(buildDimMissingTitle(m.label, m.uv, m.useUsers, m.paidUsers, 'use_rate'))+'">--</span>')+'</td>';
       h += '<td class="'+convertClass+'">'+(m.convertRate !== null ? fmtUseRate(m.convertRate) : '<span style="color:var(--t3);font-size:12px" title="'+esc(buildDimMissingTitle(m.label, m.uv, m.useUsers, m.paidUsers, 'convert_rate'))+'">--</span>')+'</td>';
       h += '<td>'+sv(m.dl)+'</td>';
@@ -5440,8 +5488,10 @@ function buildDimContent(tab, data){
         uvMissing: (gKpUv === null),
         dl: g.dl || 0,
         ct: (gKr.source === 'kp' && gKr.resource_count) ? gKr.resource_count : g.ct,
-        useUsers: gKpUse || 0,
-        paidUsers: gKpPaid || 0,
+        useUsers: gKpUse,
+        paidUsers: gKpPaid,
+        useUsersMissing: gKpUse === null,
+        paidUsersMissing: gKpPaid === null,
         label: (activeStage ? activeStage : '') + (activeCourse ? activeCourse : '') + '-' + g.name,
         useRate: useRate !== null ? useRate : null,
         convertRate: convertRate !== null ? convertRate : null
@@ -5460,7 +5510,7 @@ function buildDimContent(tab, data){
     } else {
       gradeScopeTxt = '（未选学科：整体年级无权威去重聚合，UV/转化率显示"数据不足"）';
     }
-    h += '<div class="row r2"><div class="box"><div class="box-hd"><span class="box-ttl">📅 年级 PV 排行' + (_gActiveVersion ? ' <span style="font-size:11px;font-weight:400;color:var(--t3)">'+esc(gradeScopeTxt)+'</span>' : '') + '</span></div><div class="chart" id="ch-dim-grade-pv"></div></div><div class="box"><div class="box-hd"><span class="box-ttl">📅 年级使用率排行 <span style="font-size:11px;font-weight:400;color:var(--t3)">'+gradeScopeTxt+'</span></span></div><div class="chart" id="ch-dim-grade-rate"></div></div></div>';
+    h += buildDimMetricCharts('grade', '📅 年级');
     h += '<div class="box"><div class="box-hd"><span class="box-ttl">📋 年级明细 TOP15 <span style="font-size:11px;font-weight:400;color:var(--t3)">'+gradeScopeTxt+'</span></span></div><div class="tbl-wrap"><table class="data-table module-matrix-table"><thead><tr><th style="width:18%">📅 年级</th><th style="width:14%">' + dimTh('PV', DIM_TH_NOTE.pv) + '</th><th style="width:14%">' + dimTh('UV', DIM_TH_NOTE.uv) + '</th><th style="width:14%">' + dimTh('使用率', DIM_TH_NOTE.useRate) + '</th><th style="width:14%">' + dimTh('付费转化', DIM_TH_NOTE.convertRate) + '</th><th style="width:14%">' + dimTh('下载', DIM_TH_NOTE.dl) + '</th><th style="width:12%">' + dimTh('资源数', DIM_TH_NOTE.ct) + '</th></tr></thead><tbody>';
     gr.forEach(function(g){
       var m = gradeMetrics[g.name];
@@ -5469,6 +5519,8 @@ function buildDimContent(tab, data){
       h += '<tr><td class="name">📅 '+esc(g.name)+'</td>';
       h += '<td>'+sv(g.pv,1)+'</td>';
       h += '<td>'+(m.uvMissing ? '<span style="color:var(--t3);font-size:12px" title="'+esc(buildDimMissingTitle(m.label, m.uv, m.useUsers, m.paidUsers, 'uv'))+'">--</span>' : sv(m.uv,1))+'</td>';
+      h += '<td>'+((m.useUsers === null || m.useUsersMissing) ? '<span style="color:var(--t3);font-size:12px">--</span>' : sv(m.useUsers,1))+'</td>';
+      h += '<td>'+((m.paidUsers === null || m.paidUsersMissing) ? '<span style="color:var(--t3);font-size:12px">--</span>' : sv(m.paidUsers,1))+'</td>';
       h += '<td class="'+useRateClass+'">'+(m.useRate === null ? '<span style="color:var(--t3);font-size:12px" title="'+esc(buildDimMissingTitle(m.label, m.uv, m.useUsers, m.paidUsers, 'use_rate'))+'">--</span>' : fmtUseRate(m.useRate))+'</td>';
       h += '<td class="'+convertClass+'">'+(m.convertRate === null ? '<span style="color:var(--t3);font-size:12px" title="'+esc(buildDimMissingTitle(m.label, m.uv, m.useUsers, m.paidUsers, 'convert_rate'))+'">--</span>' : fmtUseRate(m.convertRate))+'</td>';
       h += '<td>'+sv(m.dl)+'</td>';
@@ -5532,8 +5584,10 @@ function buildDimContent(tab, data){
         uvMissing: (vKpUv === null),
         dl: v.dl || 0,
         ct: (vKr.source === 'kp' && vKr.resource_count) ? vKr.resource_count : v.ct,
-        useUsers: vKpUse || 0,
-        paidUsers: vKpPaid || 0,
+        useUsers: vKpUse,
+        paidUsers: vKpPaid,
+        useUsersMissing: vKpUse === null,
+        paidUsersMissing: vKpPaid === null,
         label: (activeStage ? activeStage : '') + (activeCourse ? activeCourse : '') + '-' + v.name,
         useRate: useRate !== null ? useRate : null,
         convertRate: convertRate !== null ? convertRate : null
@@ -5551,7 +5605,7 @@ function buildDimContent(tab, data){
     } else {
       verScopeTxt = '（未选学科：整体版本无权威去重聚合，UV/转化率显示"数据不足"）';
     }
-    h += '<div class="row r2"><div class="box"><div class="box-hd"><span class="box-ttl">📖 版本 PV 排行' + (_vActiveGrade ? ' <span style="font-size:11px;font-weight:400;color:var(--t3)">'+esc(verScopeTxt)+'</span>' : '') + '</span></div><div class="chart" id="ch-dim-ver-pv"></div></div><div class="box"><div class="box-hd"><span class="box-ttl">📖 版本使用率排行 <span style="font-size:11px;font-weight:400;color:var(--t3)">'+verScopeTxt+'</span></span></div><div class="chart" id="ch-dim-ver-rate"></div></div></div>';
+    h += buildDimMetricCharts('version', '📖 版本');
     h += '<div class="box"><div class="box-hd"><span class="box-ttl">📋 版本明细 TOP15 <span style="font-size:11px;font-weight:400;color:var(--t3)">'+verScopeTxt+'</span></span></div><div class="tbl-wrap"><table class="data-table module-matrix-table"><thead><tr><th style="width:18%">📖 版本</th><th style="width:14%">' + dimTh('PV', DIM_TH_NOTE.pv) + '</th><th style="width:14%">' + dimTh('UV', DIM_TH_NOTE.uv) + '</th><th style="width:14%">' + dimTh('使用率', DIM_TH_NOTE.useRate) + '</th><th style="width:14%">' + dimTh('付费转化', DIM_TH_NOTE.convertRate) + '</th><th style="width:14%">' + dimTh('下载', DIM_TH_NOTE.dl) + '</th><th style="width:12%">' + dimTh('资源数', DIM_TH_NOTE.ct) + '</th></tr></thead><tbody>';
     ver.forEach(function(v){
       var m = verMetrics[v.name];
@@ -5560,6 +5614,8 @@ function buildDimContent(tab, data){
       h += '<tr><td class="name">📖 '+esc(v.name)+'</td>';
       h += '<td>'+sv(v.pv,1)+'</td>';
       h += '<td>'+(m.uvMissing ? '<span style="color:var(--t3);font-size:12px" title="'+esc(buildDimMissingTitle(m.label, m.uv, m.useUsers, m.paidUsers, 'uv'))+'">--</span>' : sv(m.uv,1))+'</td>';
+      h += '<td>'+((m.useUsers === null || m.useUsersMissing) ? '<span style="color:var(--t3);font-size:12px">--</span>' : sv(m.useUsers,1))+'</td>';
+      h += '<td>'+((m.paidUsers === null || m.paidUsersMissing) ? '<span style="color:var(--t3);font-size:12px">--</span>' : sv(m.paidUsers,1))+'</td>';
       h += '<td class="'+useRateClass+'">'+(m.useRate === null ? '<span style="color:var(--t3);font-size:12px" title="'+esc(buildDimMissingTitle(m.label, m.uv, m.useUsers, m.paidUsers, 'use_rate'))+'">--</span>' : fmtUseRate(m.useRate))+'</td>';
       h += '<td class="'+convertClass+'">'+(m.convertRate === null ? '<span style="color:var(--t3);font-size:12px" title="'+esc(buildDimMissingTitle(m.label, m.uv, m.useUsers, m.paidUsers, 'convert_rate'))+'">--</span>' : fmtUseRate(m.convertRate))+'</td>';
       h += '<td>'+sv(m.dl)+'</td>';
@@ -5567,38 +5623,32 @@ function buildDimContent(tab, data){
     });
     h += '</tbody></table></div></div>';
   } else if(tab==='module'){
-    // 资源分类维度：按 talos / PDF / SRM题 / 视频 / HTML 聚合
-    var mod = aggByResourceType(data);
-    // 计算每个资源类型的使用率和转化率
-    var modMetrics = {};
-    mod.forEach(function(m){
-      var typeData = data.filter(function(r){ return r.resourceType === m.name; });
-      modMetrics[m.name] = {pv:m.pv, uv:0, uvMissing:true, use:0, dl:0, ct:m.ct, useRate: calcUseRate(typeData, {resourceType: m.name}), convertRate: calcConvertRate(typeData, {resourceType: m.name})};
-      typeData.forEach(function(r){ if(r.aggLevel==='s') return; modMetrics[m.name].dl += r.download||0; });
+    var mod = getModuleMetricRows(data);
+    var moduleChartDefs = [
+      {key:'pv', label:'PV', note:DIM_TH_NOTE.pv, rate:false},
+      {key:'uv', label:'UV', note:DIM_TH_NOTE.uv, rate:false},
+      {key:'use_users', label:'使用人数', note:'去重使用用户数', rate:false},
+      {key:'paid_users', label:'付费人数', note:'去重付费用户数', rate:false},
+      {key:'use_rate', label:'使用率', note:DIM_TH_NOTE.useRate, rate:true},
+      {key:'convert_rate', label:'付费转化率', note:DIM_TH_NOTE.convertRate, rate:true}
+    ];
+    h += '<div class="row r2">';
+    moduleChartDefs.forEach(function(cd, i){
+      h += '<div class="box"><div class="box-hd"><span class="box-ttl">📦 资源分类'+cd.label+'排行</span></div><div class="chart" id="ch-dim-mod-'+cd.key+'"></div></div>';
+      if(i === 1 || i === 3) h += '</div><div class="row r2">';
     });
-
-    h += '<div class="row r2"><div class="box"><div class="box-hd"><span class="box-ttl">📦 资源分类 PV 排行</span></div><div class="chart" id="ch-dim-mod-pv"></div></div><div class="box"><div class="box-hd"><span class="box-ttl">📦 资源分类使用率排行</span></div><div class="chart" id="ch-dim-mod-rate"></div></div></div>';
-    h += '<div class="box"><div class="box-hd"><span class="box-ttl">📋 资源分类使用率×转化率矩阵</span></div><div class="tbl-wrap"><table class="data-table module-matrix-table"><thead><tr><th style="width:18%">资源分类</th><th style="width:14%">' + dimTh('使用率', DIM_TH_NOTE.useRate) + '</th><th style="width:14%">' + dimTh('付费转化', DIM_TH_NOTE.convertRate) + '</th><th style="width:14%">' + dimTh('PV', DIM_TH_NOTE.pv) + '</th><th style="width:14%">' + dimTh('UV', DIM_TH_NOTE.uv) + '</th><th style="width:12%">' + dimTh('资源数', DIM_TH_NOTE.ct) + '</th><th style="width:14%">' + dimTh('评价', DIM_TH_NOTE.eval) + '</th></tr></thead><tbody>';
+    h += '</div>';
+    h += '<div class="box"><div class="box-hd"><span class="box-ttl">📋 资源分类六项核心指标</span><span class="box-sub">去重指标无精确模块聚合时显示“数据不足”</span></div><div class="tbl-wrap"><table class="data-table module-matrix-table"><thead><tr><th style="width:14%">资源分类</th><th style="width:10%">'+dimTh('PV',DIM_TH_NOTE.pv)+'</th><th style="width:10%">'+dimTh('UV',DIM_TH_NOTE.uv)+'</th><th style="width:12%">'+dimTh('使用人数','去重使用用户数')+'</th><th style="width:12%">'+dimTh('付费人数','去重付费用户数')+'</th><th style="width:12%">'+dimTh('使用率',DIM_TH_NOTE.useRate)+'</th><th style="width:12%">'+dimTh('付费转化率',DIM_TH_NOTE.convertRate)+'</th><th style="width:9%">'+dimTh('下载',DIM_TH_NOTE.dl)+'</th><th style="width:9%">'+dimTh('资源数',DIM_TH_NOTE.ct)+'</th></tr></thead><tbody>';
     mod.forEach(function(m){
-      var mm = modMetrics[m.name];
-      var evalText = '';
-      var evalTag = '';
-      if(mm.useRate >= 40 && mm.convertRate >= 5) { evalText = '刚需+高价值'; evalTag = '<span class="insight-tag tag-good">'+evalText+'</span>'; }
-      else if(mm.useRate >= 40 && mm.convertRate < 5) { evalText = '流量大转化低'; evalTag = '<span class="insight-tag tag-warn">'+evalText+'</span>'; }
-      else if(mm.useRate < 30 && mm.convertRate >= 5) { evalText = '小众精品'; evalTag = '<span class="insight-tag tag-info">'+evalText+'</span>'; }
-      else if(mm.useRate < 20 && mm.convertRate < 3) { evalText = '需优化'; evalTag = '<span class="insight-tag tag-bad">'+evalText+'</span>'; }
-      else { evalText = '一般'; evalTag = '<span class="insight-tag tag-info">'+evalText+'</span>'; }
-
-      var useRateClass = mm.useRate >= 40 ? 'rate-high' : (mm.useRate >= 20 ? 'rate-mid' : 'rate-low');
-      var convertClass = mm.convertRate >= 5 ? 'rate-high' : (mm.convertRate >= 3 ? 'rate-mid' : 'rate-low');
-
+      var useRateClass = m.use_rate !== null && m.use_rate >= 40 ? 'rate-high' : (m.use_rate !== null && m.use_rate >= 20 ? 'rate-mid' : 'rate-low');
+      var convertClass = m.convert_rate !== null && m.convert_rate >= 5 ? 'rate-high' : (m.convert_rate !== null && m.convert_rate >= 3 ? 'rate-mid' : 'rate-low');
+      var missing = function(v, title){ return v === null ? '<span style="color:var(--t3);font-size:12px" title="'+esc(title)+'">数据不足</span>' : sv(v,1); };
       h += '<tr><td class="name">'+esc(m.name)+'</td>';
-      h += '<td class="'+useRateClass+'">'+fmtPctOrDash(mm.useRate)+'</td>';
-      h += '<td class="'+convertClass+'">'+fmtPctOrDash(mm.convertRate)+'</td>';
-      h += '<td>'+sv(m.pv,1)+'</td>';
-      h += '<td>'+(mm.uvMissing ? '<span style="color:var(--t3);font-size:12px" title="UV需按用户ID去重，资源分类维度暂无聚合数据">数据不足</span>' : sv(mm.uv,1))+'</td>';
-      h += '<td>'+fmt(m.ct)+'</td>';
-      h += '<td>'+evalTag+'</td></tr>';
+      h += '<td>'+sv(m.pv,1)+'</td><td>'+missing(m.uv,'UV需精确模块聚合')+'</td>';
+      h += '<td>'+missing(m.use_users,'使用人数需精确模块聚合')+'</td><td>'+missing(m.paid_users,'付费人数需精确模块聚合')+'</td>';
+      h += '<td class="'+useRateClass+'">'+(m.use_rate === null ? '<span style="color:var(--t3)">数据不足</span>' : fmtUseRate(m.use_rate))+'</td>';
+      h += '<td class="'+convertClass+'">'+(m.convert_rate === null ? '<span style="color:var(--t3)">数据不足</span>' : fmtUseRate(m.convert_rate))+'</td>';
+      h += '<td>'+sv(m.dl,1)+'</td><td>'+fmt(m.ct)+'</td></tr>';
     });
     h += '</tbody></table></div></div>';
   } else if(tab==='category'){
@@ -5620,14 +5670,18 @@ function buildDimContent(tab, data){
     var catMetrics = {};
     catData.forEach(function(c){
       var categoryData = data.filter(function(r){ return mapModuleToCategory(r.module || '') === c.name; });
-      var kpUv = hasCrossFilter ? null : getKpUv('category', c.name);   // 有交叉筛选时禁止套用全局板块 UV
-      catMetrics[c.name] = {pv:c.pv, uv:kpUv !== null ? kpUv : 0, uvMissing:(kpUv === null), use:0, dl:0, ct:c.ct, useRate: hasCrossFilter ? null : calcUseRate(categoryData, {category: c.name}), convertRate: hasCrossFilter ? null : calcConvertRate(categoryData, {category: c.name})};
+      var kpUv = hasCrossFilter ? null : getKpMetric('category', c.name, 'uv');
+      var kpPaid = hasCrossFilter ? null : getKpMetric('category', c.name, 'paid_users');
+      var kpUse = hasCrossFilter ? null : getKpMetric('category', c.name, 'use_users');
+      var kpUseRate = hasCrossFilter ? null : getKpMetric('category', c.name, 'use_rate');
+      var kpConvertRate = hasCrossFilter ? null : getKpMetric('category', c.name, 'convert_rate');
+      catMetrics[c.name] = {pv:c.pv, uv:kpUv !== null ? kpUv : 0, useUsers:kpUse, paidUsers:kpPaid, uvMissing:(kpUv === null), useUsersMissing:(kpUse === null), paidUsersMissing:(kpPaid === null), use:0, dl:0, ct:c.ct, useRate: kpUseRate !== null ? kpUseRate : (hasCrossFilter ? null : calcUseRate(categoryData, {category: c.name})), convertRate: kpConvertRate !== null ? kpConvertRate : (hasCrossFilter ? null : calcConvertRate(categoryData, {category: c.name}))};
       categoryData.forEach(function(r){ if(r.aggLevel==='s') return; catMetrics[c.name].dl += r.download||0; });
     });
 
     var catColors = {'轻松学':'#2563EB', '精准练':'#10B981', '模拟卷':'#F59E0B'};
-    h += '<div class="row r2"><div class="box"><div class="box-hd"><span class="box-ttl">📦 板块 PV 排行</span></div><div class="chart" id="ch-dim-cat-pv"></div></div><div class="box"><div class="box-hd"><span class="box-ttl">📦 板块使用率排行</span></div><div class="chart" id="ch-dim-cat-rate"></div></div></div>';
-    h += '<div class="box"><div class="box-hd"><span class="box-ttl">📋 板块明细（轻松学 / 精准练 / 模拟卷）<span style="font-size:11px;font-weight:400;color:var(--t3)">'+catScopeNote+'</span></span></div><div class="tbl-wrap"><table class="data-table module-matrix-table"><thead><tr><th style="width:18%">板块</th><th style="width:12%">' + dimTh('PV', DIM_TH_NOTE.pv) + '</th><th style="width:12%">' + dimTh('UV', DIM_TH_NOTE.uv) + '</th><th style="width:14%">' + dimTh('使用率', DIM_TH_NOTE.useRate) + '</th><th style="width:14%">' + dimTh('付费转化', DIM_TH_NOTE.convertRate) + '</th><th style="width:10%">' + dimTh('下载', DIM_TH_NOTE.dl) + '</th><th style="width:10%">' + dimTh('资源数', DIM_TH_NOTE.ct) + '</th><th style="width:10%">' + dimTh('评价', DIM_TH_NOTE.eval) + '</th></tr></thead><tbody>';
+    h += buildDimMetricCharts('category', '📦 板块');
+    h += '<div class="box"><div class="box-hd"><span class="box-ttl">📋 板块明细（轻松学 / 精准练 / 模拟卷）<span style="font-size:11px;font-weight:400;color:var(--t3)">'+catScopeNote+'</span></span></div><div class="tbl-wrap"><table class="data-table module-matrix-table"><thead><tr><th style="width:18%">板块</th><th style="width:12%">' + dimTh('PV', DIM_TH_NOTE.pv) + '</th><th style="width:12%">' + dimTh('UV', DIM_TH_NOTE.uv) + '</th><th style="width:11%">' + dimTh('使用人数','去重使用用户数') + '</th><th style="width:11%">' + dimTh('付费人数','去重付费用户数') + '</th><th style="width:12%">' + dimTh('使用率', DIM_TH_NOTE.useRate) + '</th><th style="width:14%">' + dimTh('付费转化', DIM_TH_NOTE.convertRate) + '</th><th style="width:10%">' + dimTh('下载', DIM_TH_NOTE.dl) + '</th><th style="width:10%">' + dimTh('资源数', DIM_TH_NOTE.ct) + '</th><th style="width:10%">' + dimTh('评价', DIM_TH_NOTE.eval) + '</th></tr></thead><tbody>';
     catData.forEach(function(c){
       var m = catMetrics[c.name];
       var evalTag = '';
@@ -5643,6 +5697,7 @@ function buildDimContent(tab, data){
       h += '<tr><td class="name"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:'+catColors[c.name]+';margin-right:6px;"></span>'+esc(c.name)+'</td>';
       h += '<td>'+sv(c.pv,1)+'</td>';
       h += '<td>'+(m.uvMissing ? '<span style="color:var(--t3);font-size:12px" title="UV需按用户ID去重，板块维度暂无聚合数据">数据不足</span>' : sv(m.uv,1))+'</td>';
+      h += '<td>'+(m.useUsersMissing ? '<span style="color:var(--t3);font-size:12px">数据不足</span>' : sv(m.useUsers,1))+'</td><td>'+(m.paidUsersMissing ? '<span style="color:var(--t3);font-size:12px">数据不足</span>' : sv(m.paidUsers,1))+'</td>';
       h += '<td class="'+useRateClass+'">'+fmtPctOrDash(m.useRate)+'</td>';
       h += '<td class="'+convertClass+'">'+fmtPctOrDash(m.convertRate)+'</td>';
       h += '<td>'+sv(m.dl)+'</td>';
@@ -5755,10 +5810,12 @@ function rOverview(){
 
   // 从 kp 获取学段学科四维数据
   var scData = getStageCourseKpData();
-  var scTop10 = scData.slice(0, 10);
-  var scByUv = scData.slice().sort(function(a,b){ return b.uv - a.uv; }).slice(0, 10);
-  var scByUse = scData.slice().sort(function(a,b){ return b.use_users - a.use_users; }).slice(0, 10);
-  var scByPaid = scData.slice().sort(function(a,b){ return b.paid_users - a.paid_users; }).slice(0, 10);
+  var _courseMetric = COURSE_METRIC_DEFS[COURSE_METRIC] || COURSE_METRIC_DEFS.pv;
+  var _courseRows = scData.slice();
+  if(_courseMetric.rate){
+    _courseRows = _courseRows.filter(function(d){ return d[COURSE_METRIC] !== null && !isNaN(d[COURSE_METRIC]); });
+  }
+  _courseRows.sort(function(a,b){ return (b[COURSE_METRIC] || 0) - (a[COURSE_METRIC] || 0); });
 
   // 各阶段对比图（PV/UV）
   // ⚠️ 取数铁律：UV 是去重指标，必须取 kp 各阶段总览聚合(getPhaseKpiOverall→kp)，
@@ -5777,152 +5834,84 @@ function rOverview(){
     c2.setOption({tooltip:{trigger:'axis'},grid:{left:50,right:30,top:10,bottom:20},xAxis:{type:'value',axisLabel:{fontSize:11,formatter:function(v){return sv(v,0);}}},yAxis:{type:'category',data:st.map(function(s){return s.name;}).reverse(),axisLabel:{fontSize:12},inverse:true},series:[{type:'bar',data:st.map(function(s){return s.pv;}).reverse(),itemStyle:{color:'#2563EB',borderRadius:[0,4,4,0]},barWidth:24,label:{show:true,position:'right',fontSize:11,formatter:function(p){return sv(p.value,1);}}}] });
   }
 
-  // 学段学科综合 TOP10（4项指标分组柱状图）
-  var c3=initChart('ch-ov-course');
-  if(c3 && scTop10.length>0){
-    var names = scTop10.map(function(d){ return d.name; }).reverse();
-    c3.setOption({
-      tooltip:{trigger:'axis', axisPointer:{type:'shadow'}},
-      legend:{data:['PV','UV','使用人数','付费人数'], top:0},
-      grid:{left:90, right:50, top:36, bottom:20},
-      xAxis:{type:'value', axisLabel:{fontSize:11, formatter:function(v){return sv(v,0);}}},
-      yAxis:{type:'category', data:names, axisLabel:{fontSize:11}, inverse:true},
-      series:[
-        {name:'PV', type:'bar', data:scTop10.map(function(d){return d.pv;}).reverse(), itemStyle:{color:'#2563EB', borderRadius:[0,4,4,0]}, barWidth:16, barGap:'20%'},
-        {name:'UV', type:'bar', data:scTop10.map(function(d){return d.uv;}).reverse(), itemStyle:{color:'#06B6D4', borderRadius:[0,4,4,0]}, barWidth:16},
-        {name:'使用人数', type:'bar', data:scTop10.map(function(d){return d.use_users;}).reverse(), itemStyle:{color:'#10B981', borderRadius:[0,4,4,0]}, barWidth:16},
-        {name:'付费人数', type:'bar', data:scTop10.map(function(d){return d.paid_users;}).reverse(), itemStyle:{color:'#F59E0B', borderRadius:[0,4,4,0]}, barWidth:16}
-      ]
+  // 学段学科合并指标图：展示全部项目，按当前指标排序
+  var cm = initChart('ch-ov-metric');
+  if(cm && _courseRows.length > 0){
+    var _formatCourseMetric = _courseMetric.rate ? function(v){ return v !== null ? fmtUseRate(v) : '--'; } : function(v){ return sv(v,1); };
+    cm.setOption({
+      tooltip:{trigger:'axis',formatter:function(p){ return p[0].name+'<br/>'+_courseMetric.label+': '+(p[0].value !== null ? _formatCourseMetric(p[0].value) : '--'); }},
+      grid:{left:95,right:46,top:12,bottom:20},
+      xAxis:{type:'value',axisLabel:{fontSize:11,formatter:_courseMetric.rate ? function(v){return v+'%';} : function(v){return sv(v,0);}}},
+      yAxis:{type:'category',data:_courseRows.map(function(d){return d.name;}).reverse(),axisLabel:{fontSize:11},inverse:true},
+      series:[{type:'bar',data:_courseRows.map(function(d){return d[COURSE_METRIC];}).reverse(),itemStyle:{color:_courseMetric.color,borderRadius:[0,4,4,0]},barWidth:16,label:{show:true,position:'right',fontSize:10,formatter:function(p){return p.value !== null ? _formatCourseMetric(p.value) : '--';}}}]
     });
-  }
-
-  // PV TOP10
-  var c4=initChart('ch-ov-pv');
-  if(c4 && scTop10.length>0){
-    c4.setOption({tooltip:{trigger:'axis'},grid:{left:85,right:20,top:10,bottom:20},xAxis:{type:'value',axisLabel:{fontSize:11,formatter:function(v){return sv(v,0);}}},yAxis:{type:'category',data:scTop10.map(function(d){return d.name;}).reverse(),axisLabel:{fontSize:11},inverse:true},series:[{type:'bar',data:scTop10.map(function(d){return d.pv;}).reverse(),itemStyle:{color:'#2563EB',borderRadius:[0,4,4,0]},barWidth:18,label:{show:true,position:'right',fontSize:10,formatter:function(p){return sv(p.value,1);}}}]});
-  }
-
-  // UV TOP10
-  var c5=initChart('ch-ov-uv');
-  if(c5 && scByUv.length>0){
-    c5.setOption({tooltip:{trigger:'axis'},grid:{left:85,right:20,top:10,bottom:20},xAxis:{type:'value',axisLabel:{fontSize:11,formatter:function(v){return sv(v,0);}}},yAxis:{type:'category',data:scByUv.map(function(d){return d.name;}).reverse(),axisLabel:{fontSize:11},inverse:true},series:[{type:'bar',data:scByUv.map(function(d){return d.uv;}).reverse(),itemStyle:{color:'#06B6D4',borderRadius:[0,4,4,0]},barWidth:18,label:{show:true,position:'right',fontSize:10,formatter:function(p){return sv(p.value,1);}}}]});
-  }
-
-  // 使用人数 TOP10
-  var c6=initChart('ch-ov-use');
-  if(c6 && scByUse.length>0){
-    c6.setOption({tooltip:{trigger:'axis'},grid:{left:85,right:20,top:10,bottom:20},xAxis:{type:'value',axisLabel:{fontSize:11,formatter:function(v){return sv(v,0);}}},yAxis:{type:'category',data:scByUse.map(function(d){return d.name;}).reverse(),axisLabel:{fontSize:11},inverse:true},series:[{type:'bar',data:scByUse.map(function(d){return d.use_users;}).reverse(),itemStyle:{color:'#10B981',borderRadius:[0,4,4,0]},barWidth:18,label:{show:true,position:'right',fontSize:10,formatter:function(p){return sv(p.value,1);}}}]});
-  }
-
-  // 付费人数 TOP10
-  var c7=initChart('ch-ov-paid');
-  if(c7 && scByPaid.length>0){
-    c7.setOption({tooltip:{trigger:'axis'},grid:{left:85,right:20,top:10,bottom:20},xAxis:{type:'value',axisLabel:{fontSize:11,formatter:function(v){return sv(v,0);}}},yAxis:{type:'category',data:scByPaid.map(function(d){return d.name;}).reverse(),axisLabel:{fontSize:11},inverse:true},series:[{type:'bar',data:scByPaid.map(function(d){return d.paid_users;}).reverse(),itemStyle:{color:'#F59E0B',borderRadius:[0,4,4,0]},barWidth:18,label:{show:true,position:'right',fontSize:10,formatter:function(p){return sv(p.value,1);}}}]});
   }
 }
 
-/** 切换学段学科主图排序模式 */
-function changeCourseSort(mode){
-  COURSE_SORT_MODE = mode;
-  rOverview();
+function switchCourseMetric(metric){
+  if(!COURSE_METRIC_DEFS[metric]) return;
+  COURSE_METRIC = metric;
+  applyAndRender();
+}
+
+function buildDimMetricCharts(dim,title){
+  var short=dim==='version'?'ver':(dim==='category'?'cat':dim);
+  var defs=[['pv','PV'],['uv','UV'],['use_users','使用人数'],['paid_users','付费人数'],['use_rate','使用率'],['convert_rate','付费转化率']];
+  var h='<div class=\"row r2\">';
+  defs.forEach(function(d,i){h+='<div class=\"box\"><div class=\"box-hd\"><span class=\"box-ttl\">'+title+' '+d[1]+'排行</span></div><div class=\"chart\" id=\"ch-dim-'+short+'-'+d[0]+'\"></div></div>';if(i===1||i===3)h+='</div><div class=\"row r2\">';});
+  return h+'</div>';
 }
 
 function rDimension(){
   var data=getFiltered();
-  var activeStage = (ACT['stage']&&ACT['stage'][0]) || '';   // 与 buildDimContent 保持一致
-  var currentPhase = (ACT['phase'] && ACT['phase'][0]) || '';
-  if(CUR_DIM_TAB==='course'){
-    // 按 学段+学科 分组（初中数学≠小学数学）
-    var cs=aggByStageCourse(data).slice(0,15);
-    var c1=initChart('ch-dim-course-pv');
-    if(c1 && cs.length>0) c1.setOption({tooltip:{trigger:'axis'},grid:{left:90,right:20,top:10,bottom:20},xAxis:{type:'value',axisLabel:{fontSize:11,formatter:function(v){return sv(v,0);}}},yAxis:{type:'category',data:cs.map(function(c){return c.name;}).reverse(),axisLabel:{fontSize:11},inverse:true},series:[{type:'bar',data:cs.map(function(c){return c.pv;}).reverse(),itemStyle:{color:'#6366F1',borderRadius:[0,4,4,0]},barWidth:18}]});
+  var dim=CUR_DIM_TAB, short=dim==='version'?'ver':(dim==='category'?'cat':(dim==='module'?'mod':dim));
+  var defs=[['pv','PV',false],['uv','UV',false],['use_users','使用人数',false],['paid_users','付费人数',false],['use_rate','使用率',true],['convert_rate','付费转化率',true]];
+  var activeStage=(ACT['stage']&&ACT['stage'][0])||'';
+  var currentPhase=(ACT['phase']&&ACT['phase'][0])||'';
+  var rows=[];
 
-    // 使用率排行图表（走 kp，无聚合则 null → 不渲染该学科，避免"缺失"显示成 0%）
-    var courseMetrics = {};
+  // Build exactly the same row metrics used by buildDimContent tables.
+  if(dim==='course'){
+    var cs=aggByStageCourse(data).slice(0,15), activeGrade=(ACT['grade']&&ACT['grade'][0])||'', activeVersion=(ACT['version']&&ACT['version'][0])||'';
+    var hasExtraSlice=!!(activeGrade||activeVersion), cm={};
     cs.forEach(function(c){
-      var r = getKpMetric('course', c.name, 'use_rate', currentPhase);
-      courseMetrics[c.name] = {useRate: r}; // 保留 null
+      var kp=function(k){return !hasExtraSlice?getKpMetric('course',c.name,k,currentPhase):null;};
+      cm[c.name]={name:c.name,pv:kp('pv')!==null?kp('pv'):c.pv,uv:kp('uv'),use_users:kp('use_users'),paid_users:kp('paid_users'),use_rate:kp('use_rate'),convert_rate:kp('convert_rate')};
     });
-    var sortedByRate = cs.slice().filter(function(c){ return courseMetrics[c.name].useRate !== null; }).sort(function(a,b){ return courseMetrics[b.name].useRate - courseMetrics[a.name].useRate; });
-    var c2=initChart('ch-dim-course-rate');
-    if(c2 && sortedByRate.length>0) c2.setOption({tooltip:{trigger:'axis',formatter:function(p){return p[0].name + '<br/>使用率: ' + fmtUseRate(p[0].value);}},grid:{left:90,right:20,top:10,bottom:20},xAxis:{type:'value',max:100,axisLabel:{fontSize:11,formatter:function(v){return v+'%';}}},yAxis:{type:'category',data:sortedByRate.map(function(c){return c.name;}).reverse(),axisLabel:{fontSize:11},inverse:true},series:[{type:'bar',data:sortedByRate.map(function(c){return courseMetrics[c.name].useRate;}).reverse(),itemStyle:{color:'#10B981',borderRadius:[0,4,4,0]},barWidth:18}]});
-  } else if(CUR_DIM_TAB==='grade'){
-    var gr=aggBy(data,'grade').filter(function(g){return g.name && g.name!=='未知' && g.name!=='nan' && g.name!=='';});
-    var c1=initChart('ch-dim-grade-pv');
-    if(c1 && gr.length>0) c1.setOption({tooltip:{trigger:'axis'},grid:{left:80,right:20,top:10,bottom:20},xAxis:{type:'value',axisLabel:{fontSize:11,formatter:function(v){return sv(v,0);}}},yAxis:{type:'category',data:gr.map(function(g){return g.name;}).reverse(),axisLabel:{fontSize:10},inverse:true},series:[{type:'bar',data:gr.map(function(g){return g.pv;}).reverse(),itemStyle:{color:'#EF4444',borderRadius:[0,4,4,0]},barWidth:16}]});
-
-    // 年级使用率图表
-    // ⚠️ 取数铁律：年级使用率是去重指标，必须查 kp 权威聚合。
-    // 口径：整体年级 / 学段×学科×年级 / 学段×学科×年级×版本 均优先取对应交叉 kp。
-    var gradeMetrics = {};
-    gr.forEach(function(g){
-      var activeCourse = (ACT['course'] && ACT['course'][0]) || '';
-      var activeVersion = (ACT['version'] && ACT['version'][0]) || '';
-      var rate = null;
-      var crossKey = findKpKey(D.kp||{}, {course: activeCourse, stage: activeStage, grade: g.name, version: activeVersion, phase: currentPhase});
-      if(crossKey && D.kp[crossKey]){
-        var ck = D.kp[crossKey];
-        var crr = parseFloat(ck.use_rate);
-        rate = !isNaN(crr) ? (crr <= 1.5 ? crr*100 : crr) : safeUseRate(ck.use_users, ck.uv);
-      }
-      gradeMetrics[g.name] = {useRate: rate};
+    rows=cs.map(function(c){return cm[c.name];});
+  } else if(dim==='grade' || dim==='version'){
+    var field=dim, summary={}, detail={};
+    data.forEach(function(r){
+      var name=r[field]; if(!name||name==='未知'||name==='nan'||name==='') return;
+      if(r.aggLevel==='s') summary[name]={pv:r.pv||0,uv:r.uv||0,dl:r.download||0,ct:1};
+      else { if(!detail[name]) detail[name]={pv:0,uv:0,dl:0,ct:0}; detail[name].pv+=r.pv||0; detail[name].uv+=r.uv||0; detail[name].dl+=r.download||0; detail[name].ct++; }
     });
-    var sortedByRate = gr.slice().filter(function(g){ return gradeMetrics[g.name].useRate !== null; }).sort(function(a,b){ return gradeMetrics[b.name].useRate - gradeMetrics[a.name].useRate; });
-    var c2=initChart('ch-dim-grade-rate');
-    if(c2 && sortedByRate.length>0) c2.setOption({tooltip:{trigger:'axis',formatter:function(p){return p[0].name + '<br/>使用率: ' + fmtUseRate(p[0].value);}},grid:{left:80,right:20,top:10,bottom:20},xAxis:{type:'value',max:100,axisLabel:{fontSize:11,formatter:function(v){return v+'%';}}},yAxis:{type:'category',data:sortedByRate.map(function(g){return g.name;}).reverse(),axisLabel:{fontSize:10},inverse:true},series:[{type:'bar',data:sortedByRate.map(function(g){return gradeMetrics[g.name].useRate;}).reverse(),itemStyle:{color:'#10B981',borderRadius:[0,4,4,0]},barWidth:16}]});
-  } else if(CUR_DIM_TAB==='version'){
-    var ver=aggBy(data,'version').filter(function(v){return v.name && v.name!=='未知' && v.name!=='nan';}).slice(0,15);
-    var c1=initChart('ch-dim-ver-pv');
-    if(c1 && ver.length>0) c1.setOption({tooltip:{trigger:'axis'},grid:{left:100,right:20,top:10,bottom:20},xAxis:{type:'value',axisLabel:{fontSize:11,formatter:function(v){return sv(v,0);}}},yAxis:{type:'category',data:ver.map(function(v){return v.name;}).reverse(),axisLabel:{fontSize:10},inverse:true},series:[{type:'bar',data:ver.map(function(v){return v.pv;}).reverse(),itemStyle:{color:'#8B5CF6',borderRadius:[0,4,4,0]},barWidth:16}]});
-
-    // 版本使用率图表
-    // ⚠️ 取数铁律：版本使用率是去重指标，必须查 kp 权威聚合。
-    // 口径：整体版本 / 学段×学科×版本 / 学段×学科×年级×版本 均优先取对应交叉 kp。
-    var verMetrics = {};
-    ver.forEach(function(v){
-      var activeCourse = (ACT['course'] && ACT['course'][0]) || '';
-      var activeGrade = (ACT['grade'] && ACT['grade'][0]) || '';
-      var rate = null;
-      var crossKey = findKpKey(D.kp||{}, {course: activeCourse, stage: activeStage, version: v.name, grade: activeGrade, phase: currentPhase});
-      if(crossKey && D.kp[crossKey]){
-        var ck = D.kp[crossKey];
-        var crr = parseFloat(ck.use_rate);
-        rate = !isNaN(crr) ? (crr <= 1.5 ? crr*100 : crr) : safeUseRate(ck.use_users, ck.uv);
-      }
-      verMetrics[v.name] = {useRate: rate};
+    var map={}; Object.keys(summary).forEach(function(k){map[k]=summary[k];}); Object.keys(detail).forEach(function(k){if(!map[k])map[k]=detail[k];});
+    var names=Object.keys(map).map(function(name){return {name:name,pv:map[name].pv||0,uvRaw:map[name].uv||0,dl:map[name].dl||0,ct:map[name].ct||0};}).sort(function(a,b){return b.pv-a.pv;}).slice(0,15);
+    var activeCourse=(ACT['course']&&ACT['course'][0])||'', activeGrade2=(ACT['grade']&&ACT['grade'][0])||'';
+    rows=names.map(function(x){
+      var ctx={phase:currentPhase,stage:activeStage,course:activeCourse}; ctx[field]=x.name; if(dim==='grade')ctx.version=(ACT['version']&&ACT['version'][0])||''; else ctx.grade=activeGrade2;
+      var kr=resolveKpiForContext([],ctx), kp=kr.source==='kp';
+      var uv=kp?kr.uv:null, use=kp?kr.use_users:null, paid=kp?kr.paid_users:null;
+      return {name:x.name,pv:kp&&kr.pv!==null?kr.pv:x.pv,uv:uv,use_users:use,paid_users:paid,use_rate:(kp&&use!==null&&uv!==null)?safeUseRate(use,uv):null,convert_rate:(kp&&paid!==null&&uv!==null)?safeConvertRateFromUv(paid,uv):null};
     });
-    var sortedByRate = ver.slice().filter(function(v){ return verMetrics[v.name].useRate !== null; }).sort(function(a,b){ return verMetrics[b.name].useRate - verMetrics[a.name].useRate; });
-    var c2=initChart('ch-dim-ver-rate');
-    if(c2 && sortedByRate.length>0) c2.setOption({tooltip:{trigger:'axis',formatter:function(p){return p[0].name + '<br/>使用率: ' + fmtUseRate(p[0].value);}},grid:{left:100,right:20,top:10,bottom:20},xAxis:{type:'value',max:100,axisLabel:{fontSize:11,formatter:function(v){return v+'%';}}},yAxis:{type:'category',data:sortedByRate.map(function(v){return v.name;}).reverse(),axisLabel:{fontSize:10},inverse:true},series:[{type:'bar',data:sortedByRate.map(function(v){return verMetrics[v.name].useRate;}).reverse(),itemStyle:{color:'#10B981',borderRadius:[0,4,4,0]},barWidth:16}]});
-  } else if(CUR_DIM_TAB==='module'){
-    var mod = aggByResourceType(data);
-    var c1 = initChart('ch-dim-mod-pv');
-    if(c1 && mod.length>0) c1.setOption({tooltip:{trigger:'axis'},grid:{left:90,right:20,top:10,bottom:20},xAxis:{type:'value',axisLabel:{fontSize:11,formatter:function(v){return sv(v,0);}}},yAxis:{type:'category',data:mod.map(function(m){return m.name;}).reverse(),axisLabel:{fontSize:10},inverse:true},series:[{type:'bar',data:mod.map(function(m){return m.pv;}).reverse(),itemStyle:{color:'#F59E0B',borderRadius:[0,4,4,0]},barWidth:16}]});
-
-    var modMetrics = {};
-    mod.forEach(function(m){
-      var typeData = data.filter(function(r){ return r.resourceType === m.name; });
-      modMetrics[m.name] = {useRate: calcUseRate(typeData, {resourceType: m.name})};
+  } else if(dim==='module'){
+    rows=getModuleMetricRows(data).map(function(m){return {name:m.name,pv:m.pv,uv:m.uv,use_users:m.use_users,paid_users:m.paid_users,use_rate:m.use_rate,convert_rate:m.convert_rate};});
+  } else if(dim==='category'){
+    var cats=aggByCategory(data), cross=!!((ACT['course']&&ACT['course'][0])||(ACT['stage']&&ACT['stage'][0])||(ACT['grade']&&ACT['grade'][0])||(ACT['version']&&ACT['version'][0]));
+    rows=cats.map(function(c){
+      var kpUv=!cross?getKpMetric('category',c.name,'uv'):null, kpUse=!cross?getKpMetric('category',c.name,'use_users'):null, kpPaid=!cross?getKpMetric('category',c.name,'paid_users'):null;
+      var kpUr=!cross?getKpMetric('category',c.name,'use_rate'):null, kpCr=!cross?getKpMetric('category',c.name,'convert_rate'):null;
+      var cd=data.filter(function(r){return mapModuleToCategory(r.module||'')===c.name;});
+      return {name:c.name,pv:c.pv,uv:kpUv,use_users:kpUse,paid_users:kpPaid,use_rate:kpUr!==null?kpUr:(cross?null:calcUseRate(cd,{category:c.name})),convert_rate:kpCr!==null?kpCr:(cross?null:calcConvertRate(cd,{category:c.name}))};
     });
-    var sortedByRate = mod.slice().filter(function(m){ return modMetrics[m.name].useRate !== null; }).sort(function(a,b){ return modMetrics[b.name].useRate - modMetrics[a.name].useRate; });
-    var c2 = initChart('ch-dim-mod-rate');
-    if(c2 && sortedByRate.length>0) c2.setOption({tooltip:{trigger:'axis',formatter:function(p){return p[0].name + '<br/>使用率: ' + fmtUseRate(p[0].value);}},grid:{left:90,right:20,top:10,bottom:20},xAxis:{type:'value',max:100,axisLabel:{fontSize:11,formatter:function(v){return v+'%';}}},yAxis:{type:'category',data:sortedByRate.map(function(m){return m.name;}).reverse(),axisLabel:{fontSize:10},inverse:true},series:[{type:'bar',data:sortedByRate.map(function(m){return modMetrics[m.name].useRate;}).reverse(),itemStyle:{color:'#10B981',borderRadius:[0,4,4,0]},barWidth:16}]});
-  } else if(CUR_DIM_TAB==='category'){
-    var cat = aggByCategory(data);
-    var catColors = {'轻松学':'#2563EB', '精准练':'#10B981', '模拟卷':'#F59E0B'};
-    var c1=initChart('ch-dim-cat-pv');
-    if(c1 && cat.length>0) c1.setOption({tooltip:{trigger:'axis'},grid:{left:70,right:20,top:10,bottom:20},xAxis:{type:'value',axisLabel:{fontSize:11,formatter:function(v){return sv(v,0);}}},yAxis:{type:'category',data:cat.map(function(c){return c.name;}).reverse(),axisLabel:{fontSize:11},inverse:true},series:[{type:'bar',data:cat.map(function(c){return c.pv;}).reverse(),itemStyle:{color:function(p){return catColors[p.name];},borderRadius:[0,4,4,0]},barWidth:20}]});
-
-    // 板块使用率图表
-    var catMetrics = {};
-    cat.forEach(function(c){
-      var catData = data.filter(function(r){ return mapModuleToCategory(r.module || '') === c.name; });
-      catMetrics[c.name] = {useRate: calcUseRate(catData, {category: c.name})};
-    });
-    var sortedByRate = cat.slice().sort(function(a,b){ return catMetrics[b.name].useRate - catMetrics[a.name].useRate; });
-    var c2=initChart('ch-dim-cat-rate');
-    if(c2 && sortedByRate.length>0) c2.setOption({tooltip:{trigger:'axis',formatter:function(p){return p[0].name + '<br/>使用率: ' + fmtUseRate(p[0].value);}},grid:{left:70,right:20,top:10,bottom:20},xAxis:{type:'value',max:100,axisLabel:{fontSize:11,formatter:function(v){return v+'%';}}},yAxis:{type:'category',data:sortedByRate.map(function(c){return c.name;}).reverse(),axisLabel:{fontSize:11},inverse:true},series:[{type:'bar',data:sortedByRate.map(function(c){return catMetrics[c.name].useRate;}).reverse(),itemStyle:{color:function(p){return catColors[p.name];},borderRadius:[0,4,4,0]},barWidth:20}]});
   }
+
+  defs.forEach(function(def){
+    var key=def[0], label=def[1], rate=def[2], chart=initChart('ch-dim-'+short+'-'+key); if(!chart)return;
+    var valid=rows.map(function(r){return {name:r.name,v:r[key]};}).filter(function(x){return x.v!==null&&x.v!==undefined&&!isNaN(x.v);}).sort(function(a,b){return b.v-a.v;});
+    chart.setOption({tooltip:{trigger:'axis',formatter:function(p){var v=p[0].value;return p[0].name+'<br/>'+label+': '+(rate?fmtUseRate(v):sv(v,1));}},grid:{left:90,right:35,top:10,bottom:20},xAxis:{type:'value',max:rate?100:null,axisLabel:{fontSize:11,formatter:rate?function(v){return v+'%';}:function(v){return sv(v,0);}}},yAxis:{type:'category',data:valid.map(function(x){return x.name;}).reverse(),axisLabel:{fontSize:10},inverse:true},series:[{name:label,type:'bar',data:valid.map(function(x){return x.v;}).reverse(),itemStyle:{color:rate?'#10B981':'#2563EB',borderRadius:[0,4,4,0]},barWidth:16,label:{show:true,position:'right',fontSize:10,formatter:function(p){return rate?fmtUseRate(p.value):sv(p.value,1);}}}]});
+  });
 }
 
 function renderDimCharts(tab){ rDimension(); }
