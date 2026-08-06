@@ -2078,6 +2078,7 @@ function getPhaseKpiOverall(phase, data) {
     return {
       pv: kp.pv || 0, uv: kp.uv || 0, dl: kp.dl || 0,
       useUsers: kp.use_users || 0, paid: kp.paid_users || 0,
+      paidUsers: kp.paid_users || 0,
       ct: kp.rc || 0, source: 'kp', dedupMissing: false
     };
   }
@@ -2253,6 +2254,8 @@ function aggByStageCourse(data){
       var kp=D.kp[k];
       if(!kp || !kp.pv) return;
       var name=sk, stage=sk.slice(0,2), course=sk.slice(2);
+      // 排除纯学段 key（如「24-25春季期中::初中」），只保留学段+学科组合
+      if(!course) return;
       // 应用学段筛选
       if(_actStage && stage !== _actStage) return;
       // 应用学科筛选
@@ -2276,6 +2279,8 @@ function aggByStageCourse(data){
         var kp = D.kp[k];
         if(!kp || !kp.pv) return;
         var name = sk, stage = sk.slice(0, 2), course = sk.slice(2);
+        // 排除纯学段 key，只保留学段+学科组合
+        if(!course) return;
         if(_actStage && stage !== _actStage) return;
         if(_actCourse && course !== _actCourse) return;
         // 不覆盖已有明细聚合结果，只在缺失时补齐
@@ -2284,7 +2289,11 @@ function aggByStageCourse(data){
       });
     });
   }
-  return Object.entries(m).map(function(e){ return {name:e[0],stage:e[1].stage,course:e[1].course,pv:e[1].pv,uv:e[1].uv,dl:e[1].dl,pr:e[1].pr,ct:e[1].ct,useUsers:e[1].useUsers}; }).sort(function(a,b){ return b.pv-a.pv; });
+  return Object.entries(m).map(function(e){
+    var _ph = resolveDimensionPhase(data);
+    var paidUsers = getKpMetric('course', e[0], 'paid_users', _ph);
+    return {name:e[0],stage:e[1].stage,course:e[1].course,pv:e[1].pv,uv:e[1].uv,dl:e[1].dl,pr:e[1].pr,ct:e[1].ct,useUsers:e[1].useUsers,paidUsers:paidUsers};
+  }).sort(function(a,b){ return b.pv-a.pv; });
 }
 function aggByCategory(data){ var m={}; var hasDetail=data.some(function(r){return r.aggLevel!=='s';}); data.forEach(function(r){ if(hasDetail && r.aggLevel==='s') return; var k=mapModuleToCategory(r.module || ''); if(!k) return; if(!m[k]) m[k]={pv:0,uv:0,dl:0,pr:0,ct:0,useUsers:0}; m[k].pv+=r.pv||0; m[k].uv+=r.uv||0; m[k].dl+=r.download||0; m[k].pr+=r.preview||0; m[k].ct++; m[k].useUsers+=r.total_users||0; }); return Object.entries(m).map(function(e){ return {name:e[0],pv:e[1].pv,uv:e[1].uv,dl:e[1].dl,pr:e[1].pr,ct:e[1].ct,useUsers:e[1].useUsers}; }).sort(function(a,b){ return b.pv-a.pv; }); }
 
@@ -2502,9 +2511,11 @@ function getKpMetric(dim, name, metric, phase){
     if(kpData[pref+candidates[i]]){ kp = kpData[pref+candidates[i]]; break; }
   }
   if(!kp){
+    // fallback 严格限定同 phase，绝不允许跨阶段匹配（否则时间对比会拿到其他阶段数据）
     var keys = Object.keys(kpData);
     for(var i=0;i<candidates.length;i++){
       for(var j=0;j<keys.length;j++){
+        if(pref && keys[j].indexOf(pref) !== 0) continue;
         var sk = keys[j].indexOf('::')>=0 ? keys[j].slice(keys[j].indexOf('::')+2) : keys[j];
         if(sk === candidates[i]){ kp = kpData[keys[j]]; break; }
       }
@@ -4883,6 +4894,15 @@ function getDimYoyRows(dim, phase){
     }
     else if(dim === 'grade'){ var m=sk.match(/^年级-(.+)$/); if(m) name=m[1]; }
     else if(dim === 'version'){ var m=sk.match(/^版本-(.+)$/); if(m) name=m[1]; }
+    else if(dim === 'category'){
+      // 学练测/板块：兼容「场景-板块（X）」与「学练测-X」两种 key 格式
+      var aliasMap={'轻松学':'学','精准练':'练','模拟卷':'测'};
+      var m1=sk.match(/^场景-板块（(学|练|测)）$/); if(m1) name=m1[1];
+      else {
+        var m2=sk.match(/^学练测-(轻松学|精准练|模拟卷)$/); if(m2) name=aliasMap[m2[1]];
+        else { var m3=sk.match(/^学练测-(学|练|测)$/); if(m3) name=m3[1]; }
+      }
+    }
     if(name && !seen[name]){ seen[name]=true; var kp=kpData[k]; rows.push({name:name,pv:kp.pv||0,uv:kp.uv||0,dl:kp.dl||0,ct:kp.rc||0,useUsers:kp.use_users||0,paidUsers:kp.paid_users||0}); }
   });
   return rows;
@@ -4902,8 +4922,11 @@ function buildDimYoyContent(dim, data){
     if (allSamePh2 && firstPh2) basePhase = firstPh2;
   }
   var baseLabel = basePhase || '全部阶段';
+  // 把实际现期阶段暴露给基期选择器，确保下拉正确排除现期
+  window._DIM_BASE_PHASE = basePhase;
 
-  var comparePhases = DIM_TIME_COMPARE.comparePhases || [];
+  // 过滤空字符串基期，避免空值进入对比列
+  var comparePhases = (DIM_TIME_COMPARE.comparePhases || []).filter(function(p){ return !!p; });
   var hasCompare = comparePhases.length > 0;
 
   // 基准数据 = 当前左侧筛选数据（现期）
@@ -4920,15 +4943,15 @@ function buildDimYoyContent(dim, data){
     'use_rate': {label:'使用率', fmt:fmtPct},
     'resource_count': {label:'资源量', fmt:function(v){ return fmt(v); }}
   };
-  var showMetrics = ['pv','uv','use_rate','download_count','resource_count'];
+  var showMetrics = ['pv','uv','use_users','paid_users','use_rate','download_count','resource_count'];
 
   // 按维度聚合（不过滤，保留全部维度用于表格）
   // ⚠️ 学科维度必须按 学段+学科 分组（初中化学≠高中化学），不能直接用 aggBy(course) 跨学段累加。
   var baseAgg, compareAggList;
-  if(dim === 'category'){
-    // 资源分类（板块）全部从 kp 取（阶段::资源分类-{name}），绝不累加明细（v7.6）
-    baseAgg = getModuleMetricRows(baseData).filter(function(item){ return item.name && item.name !== '' && item.pv; }).map(function(item){
-      return {name:item.name, pv:item.pv, uv:item.uv, dl:item.dl, ct:item.ct, useUsers:item.use_users};
+  if(dim === 'module'){
+    // 资源分类全部从 kp 取（阶段::资源分类-{name}），绝不累加明细（v7.6）
+    baseAgg = getModuleMetricRows(null, basePhase).filter(function(item){ return item.name && item.name !== '' && item.pv; }).map(function(item){
+      return {name:item.name, pv:item.pv, uv:item.uv, dl:item.dl, ct:item.ct, useUsers:item.use_users, paidUsers:item.paid_users, useRate:item.use_rate, convertRate:item.convert_rate};
     });
   } else if(dim === 'course'){
     baseAgg = aggByStageCourse(baseData);
@@ -4943,9 +4966,9 @@ function buildDimYoyContent(dim, data){
     var cpHasAnyDetail = rawCpData.some(function(r){ return r.aggLevel !== 's'; });
     var cpData = rawCpData.filter(function(r){ return cpHasAnyDetail ? r.aggLevel !== 's' : true; });
     var agg;
-    if(dim === 'category'){
-      agg = getModuleMetricRows(cpData).filter(function(item){ return item.name && item.name !== '' && item.pv; }).map(function(item){
-        return {name:item.name, pv:item.pv, uv:item.uv, dl:item.dl, ct:item.ct, useUsers:item.use_users};
+    if(dim === 'module'){
+      agg = getModuleMetricRows(null, cp).filter(function(item){ return item.name && item.name !== '' && item.pv; }).map(function(item){
+        return {name:item.name, pv:item.pv, uv:item.uv, dl:item.dl, ct:item.ct, useUsers:item.use_users, paidUsers:item.paid_users, useRate:item.use_rate, convertRate:item.convert_rate};
       });
     } else if(dim === 'course'){
       agg = aggByStageCourse(cpData);
@@ -4990,28 +5013,39 @@ function buildDimYoyContent(dim, data){
   h += '<th colspan="'+showMetrics.length+'" style="text-align:center;background:#DBEAFE;color:var(--blue);font-size:13px">📊 现期<br><span style="font-weight:400;font-size:10px">'+esc(baseLabel)+'</span></th>';
   comparePhases.forEach(function(cp, i){
     h += '<th colspan="'+showMetrics.length+'" style="text-align:center;background:#D1FAE5;color:#059669;font-size:13px">📊 基期<br><span style="font-weight:400;font-size:10px">'+esc(cp)+'</span></th>';
-    h += '<th colspan="2" style="text-align:center;background:#FEF3C7;color:#D97706;font-size:13px">变化('+esc(cp)+')</th>';
+    h += '<th colspan="2" style="text-align:center;background:#FEF3C7;color:#D97706;font-size:13px">变化率('+esc(cp)+')</th>';
   });
   h += '</tr><tr>';
-  showMetrics.forEach(function(mk){ h += '<th style="width:70px;text-align:center">' + metricConfig[mk].label + '</th>'; });
+    showMetrics.forEach(function(mk){ h += '<th style="width:70px;text-align:center">' + metricConfig[mk].label + '</th>'; });
   comparePhases.forEach(function(cp, i){
     showMetrics.forEach(function(mk){ h += '<th style="width:70px;text-align:center;background:var(--s)">' + metricConfig[mk].label + '</th>'; });
-    h += '<th style="width:60px;text-align:center">净变化</th>';
-    h += '<th style="width:60px;text-align:center">变化率</th>';
+    h += '<th style="width:70px;text-align:center">使用率变化率</th>';
+    h += '<th style="width:70px;text-align:center">付费转化变化率</th>';
   });
   h += '</tr></thead><tbody>';
 
   // 数据行
   sortedNames.forEach(function(name){
-    var baseItem = baseAgg.find(function(item){ return item.name === name; }) || {pv:0, uv:0, dl:0, ct:0, useUsers:0};
-    // ⚠️ UV 去重：按维度查 kp，无则 null → 显示"--"，不用明细累加
-    var baseKpUv = getKpUv(dim, name, basePhase);
-    var baseMetrics = {
-      pv: baseItem.pv, uv: baseKpUv, download_count: baseItem.dl,
-      // ⚠️ 使用率是去重指标：按维度查 kp 聚合(已去重)，无则 null → "数据不足"，不用明细累加
-      use_rate: getKpRate(dim, name, 'use_rate', basePhase),
-      resource_count: baseItem.ct
-    };
+    var baseItem = baseAgg.find(function(item){ return item.name === name; }) || {pv:0, uv:0, dl:0, ct:0, useUsers:0, paidUsers:0, useRate:null, convertRate:null};
+    // 资源分类已在 getModuleMetricRows 中从 kp 精确聚合，直接使用；其他维度走通用 kp 查询。
+    var baseMetrics;
+    if(dim === 'module'){
+      baseMetrics = {
+        pv: baseItem.pv, uv: baseItem.uv, use_users: baseItem.useUsers, paid_users: baseItem.paidUsers,
+        use_rate: baseItem.useRate, convert_rate: baseItem.convertRate,
+        download_count: baseItem.dl, resource_count: baseItem.ct
+      };
+    } else {
+      // ⚠️ UV 去重：按维度查 kp，无则 null → 显示"--"，不用明细累加
+      var baseKpUv = getKpUv(dim, name, basePhase);
+      baseMetrics = {
+        pv: baseItem.pv, uv: baseKpUv, use_users: baseItem.useUsers, paid_users: baseItem.paidUsers,
+        // ⚠️ 使用率/转化率是去重指标：按维度查 kp 聚合(已去重)，无则 null → "数据不足"，不用明细累加
+        use_rate: getKpRate(dim, name, 'use_rate', basePhase),
+        convert_rate: getKpRate(dim, name, 'convert_rate', basePhase),
+        download_count: baseItem.dl, resource_count: baseItem.ct
+      };
+    }
 
     h += '<tr><td class="name" style="font-weight:600;text-align:center">' + esc(name) + '</td>';
 
@@ -5034,19 +5068,30 @@ function buildDimYoyContent(dim, data){
     // 各基期
     comparePhases.forEach(function(cp, i){
       var compareAgg = compareAggList[i].agg;
-      var compareItem = compareAgg.find(function(item){ return item.name === name; }) || {pv:0, uv:0, dl:0, ct:0, useUsers:0};
-      var compareHasDetail = compareAggList[i].hasDetail;
-      // ⚠️ UV 去重：按维度查 kp，无则 null → 显示"--"，不用明细累加
-      var compareKpUv = getKpUv(dim, name, cp);
-      // 若对比期无明细，次数类指标也从 kp 取（与 UV/使用率一致），避免全为 0
-      var compareMetrics = {
-        pv: compareHasDetail ? compareItem.pv : (getKpMetric(dim, name, 'pv', cp) || compareItem.pv),
-        uv: compareKpUv,
-        download_count: compareHasDetail ? compareItem.dl : (getKpMetric(dim, name, 'dl', cp) || compareItem.dl),
-        // ⚠️ 使用率是去重指标：按维度查 kp 聚合(已去重)，无则 null → "数据不足"，不用明细累加
-        use_rate: getKpRate(dim, name, 'use_rate', cp),
-        resource_count: compareHasDetail ? compareItem.ct : (getKpMetric(dim, name, 'rc', cp) || compareItem.ct)
-      };
+      var compareItem = compareAgg.find(function(item){ return item.name === name; }) || {pv:0, uv:0, dl:0, ct:0, useUsers:0, paidUsers:0, useRate:null, convertRate:null};
+      var compareMetrics;
+      if(dim === 'module'){
+        // 资源分类已在 getModuleMetricRows 中从 kp 精确聚合，直接使用
+        compareMetrics = {
+          pv: compareItem.pv, uv: compareItem.uv, use_users: compareItem.useUsers, paid_users: compareItem.paidUsers,
+          use_rate: compareItem.useRate, convert_rate: compareItem.convertRate,
+          download_count: compareItem.dl, resource_count: compareItem.ct
+        };
+      } else {
+        var compareHasDetail = compareAggList[i].hasDetail;
+        // ⚠️ UV 去重：按维度查 kp，无则 null → 显示"--"，不用明细累加
+        var compareKpUv = getKpUv(dim, name, cp);
+        // 若对比期无明细，次数类指标也从 kp 取（与 UV/使用率一致），避免全为 0
+        compareMetrics = {
+          pv: compareHasDetail ? compareItem.pv : (getKpMetric(dim, name, 'pv', cp) || compareItem.pv),
+          uv: compareKpUv, use_users: compareItem.useUsers, paid_users: compareItem.paidUsers,
+          download_count: compareHasDetail ? compareItem.dl : (getKpMetric(dim, name, 'dl', cp) || compareItem.dl),
+          // ⚠️ 使用率/转化率是去重指标：按维度查 kp 聚合(已去重)，无则 null → "数据不足"，不用明细累加
+          use_rate: getKpRate(dim, name, 'use_rate', cp),
+          convert_rate: getKpRate(dim, name, 'convert_rate', cp),
+          resource_count: compareHasDetail ? compareItem.ct : (getKpMetric(dim, name, 'rc', cp) || compareItem.ct)
+        };
+      }
 
       showMetrics.forEach(function(mk){
         var v = compareMetrics[mk];
@@ -5063,20 +5108,28 @@ function buildDimYoyContent(dim, data){
         h += '</td>';
       });
 
-      // 变化（基于使用率）
-      var baseRate = baseMetrics.use_rate;
-      var compareRate = compareMetrics.use_rate;
-      var hasMissingRate = baseRate === null || compareRate === null;
-      var delta = hasMissingRate ? null : compareRate - baseRate;
-      var deltaPct = hasMissingRate ? null : (baseRate > 0 ? (delta / baseRate * 100) : (compareRate > 0 ? 100 : 0));
-      var deltaColor = hasMissingRate ? 'var(--t3)' : (delta > 0 ? 'var(--g)' : (delta < 0 ? 'var(--r)' : 'var(--t3)'));
-      var deltaIcon = hasMissingRate ? '−' : (delta > 0 ? '▲' : (delta < 0 ? '▼' : '−'));
+      // 变化率（使用率 & 付费转化率）
+      var baseUseRate = baseMetrics.use_rate;
+      var compareUseRate = compareMetrics.use_rate;
+      var hasMissingUseRate = baseUseRate === null || compareUseRate === null;
+      var useDelta = hasMissingUseRate ? null : compareUseRate - baseUseRate;
+      var useDeltaPct = hasMissingUseRate ? null : (baseUseRate > 0 ? (useDelta / baseUseRate * 100) : (compareUseRate > 0 ? 100 : 0));
+      var useColor = hasMissingUseRate ? 'var(--t3)' : (useDelta > 0 ? 'var(--g)' : (useDelta < 0 ? 'var(--r)' : 'var(--t3)'));
+      var useIcon = hasMissingUseRate ? '−' : (useDelta > 0 ? '▲' : (useDelta < 0 ? '▼' : '−'));
 
-      h += '<td style="text-align:center;padding:6px;font-weight:600;color:' + deltaColor + '">';
-      if(hasMissingRate){ h += '--'; } else { h += (delta >= 0 ? '+' : '') + delta.toFixed(2) + 'pp'; }
+      var baseConvertRate = baseMetrics.convert_rate;
+      var compareConvertRate = compareMetrics.convert_rate;
+      var hasMissingConvertRate = baseConvertRate === null || compareConvertRate === null;
+      var convertDelta = hasMissingConvertRate ? null : compareConvertRate - baseConvertRate;
+      var convertDeltaPct = hasMissingConvertRate ? null : (baseConvertRate > 0 ? (convertDelta / baseConvertRate * 100) : (compareConvertRate > 0 ? 100 : 0));
+      var convertColor = hasMissingConvertRate ? 'var(--t3)' : (convertDelta > 0 ? 'var(--g)' : (convertDelta < 0 ? 'var(--r)' : 'var(--t3)'));
+      var convertIcon = hasMissingConvertRate ? '−' : (convertDelta > 0 ? '▲' : (convertDelta < 0 ? '▼' : '−'));
+
+      h += '<td style="text-align:center;padding:6px;font-weight:600;color:' + useColor + '">';
+      if(hasMissingUseRate){ h += '--'; } else { h += useIcon + ' ' + Math.abs(useDeltaPct).toFixed(2) + '%'; }
       h += '</td>';
-      h += '<td style="text-align:center;padding:6px;font-weight:600;color:' + deltaColor + '">';
-      if(hasMissingRate){ h += '--'; } else { h += deltaIcon + ' ' + Math.abs(deltaPct).toFixed(2) + '%'; }
+      h += '<td style="text-align:center;padding:6px;font-weight:600;color:' + convertColor + '">';
+      if(hasMissingConvertRate){ h += '--'; } else { h += convertIcon + ' ' + Math.abs(convertDeltaPct).toFixed(2) + '%'; }
       h += '</td>';
     });
 
@@ -5087,48 +5140,64 @@ function buildDimYoyContent(dim, data){
   if(sortedNames.length > 0){
     h += '<tr style="background:var(--s);font-weight:600">';
     h += '<td style="padding:6px;text-align:center">合计</td>';
-    var totalBase = {pv:0, uv:0, dl:0, ct:0, useUsers:0};
-    baseAgg.forEach(function(b){ totalBase.pv += b.pv; totalBase.uv += b.uv; totalBase.dl += b.dl; totalBase.ct += b.ct; totalBase.useUsers += b.useUsers; });
-    // ⚠️ 合计使用率是去重指标：取阶段总览 kp(已去重)，无则 null → "数据不足"，不用明细累加
+    var totalBase = {pv:0, dl:0, ct:0};
+    baseAgg.forEach(function(b){ totalBase.pv += b.pv; totalBase.dl += b.dl; totalBase.ct += b.ct; });
+    // ⚠️ 合计去重指标（UV/使用用户/付费用户/率）必须取阶段总览 kp(已去重)，不能将各维度值直接相加
     var baseOverall = getPhaseKpiOverall(basePhase, baseData);
     var baseOverallOk = baseOverall.source === 'kp' && !baseOverall.dedupMissing;
     var totalBaseMetrics = {
-      pv: totalBase.pv, uv: baseOverallOk ? (baseOverall.uv || 0) : null, download_count: totalBase.dl,
+      pv: totalBase.pv, uv: baseOverallOk ? (baseOverall.uv || 0) : null,
+      use_users: baseOverallOk ? (baseOverall.useUsers || 0) : null,
+      paid_users: baseOverallOk ? (baseOverall.paidUsers || 0) : null,
       use_rate: baseOverallOk ? safeUseRate(baseOverall.useUsers, baseOverall.uv) : null,
-      resource_count: totalBase.ct
+      convert_rate: baseOverallOk ? safeConvertRateFromUv(baseOverall.paidUsers, baseOverall.uv) : null,
+      download_count: totalBase.dl, resource_count: totalBase.ct
     };
     showMetrics.forEach(function(mk){
       h += '<td style="text-align:center;padding:6px">' + metricConfig[mk].fmt(totalBaseMetrics[mk]) + '</td>';
     });
 
     comparePhases.forEach(function(cp, i){
-      var totalCompare = {pv:0, uv:0, dl:0, ct:0, useUsers:0};
-      compareAggList[i].agg.forEach(function(c){ totalCompare.pv += c.pv; totalCompare.uv += c.uv; totalCompare.dl += c.dl; totalCompare.ct += c.ct; totalCompare.useUsers += c.useUsers; });
+      var totalCompare = {pv:0, dl:0, ct:0};
+      compareAggList[i].agg.forEach(function(c){ totalCompare.pv += c.pv; totalCompare.dl += c.dl; totalCompare.ct += c.ct; });
       var compareHasDetail = compareAggList[i].hasDetail;
-      // ⚠️ 合计使用率是去重指标：取该阶段总览 kp(已去重)，无则 null → "数据不足"，不用明细累加
+      // ⚠️ 合计去重指标（UV/使用用户/付费用户/率）必须取该阶段总览 kp(已去重)，无则 null → "数据不足"，不用明细累加
       var cpOverall = getPhaseKpiOverall(cp, ALL_RES);
       var cpOverallOk = cpOverall.source === 'kp' && !cpOverall.dedupMissing;
       var totalCompareMetrics = {
         pv: compareHasDetail ? totalCompare.pv : (cpOverall.pv || totalCompare.pv),
         uv: cpOverallOk ? (cpOverall.uv || 0) : null,
-        download_count: compareHasDetail ? totalCompare.dl : (cpOverall.dl || totalCompare.dl),
+        use_users: cpOverallOk ? (cpOverall.useUsers || 0) : null,
+        paid_users: cpOverallOk ? (cpOverall.paidUsers || 0) : null,
         use_rate: cpOverallOk ? safeUseRate(cpOverall.useUsers, cpOverall.uv) : null,
+        convert_rate: cpOverallOk ? safeConvertRateFromUv(cpOverall.paidUsers, cpOverall.uv) : null,
+        download_count: compareHasDetail ? totalCompare.dl : (cpOverall.dl || totalCompare.dl),
         resource_count: compareHasDetail ? totalCompare.ct : (cpOverall.ct || cpOverall.rc || totalCompare.ct)
       };
       showMetrics.forEach(function(mk){
         h += '<td style="text-align:center;padding:6px;background:var(--s)">' + metricConfig[mk].fmt(totalCompareMetrics[mk]) + '</td>';
       });
-      var totalBaseRate = totalBaseMetrics.use_rate;
-      var totalCompareRate = totalCompareMetrics.use_rate;
-      var hasTotalMissingRate = totalBaseRate === null || totalCompareRate === null;
-      var totalDelta = hasTotalMissingRate ? null : totalCompareRate - totalBaseRate;
-      var totalDeltaPct = hasTotalMissingRate ? null : (totalBaseRate > 0 ? (totalDelta / totalBaseRate * 100) : (totalCompareRate > 0 ? 100 : 0));
-      var totalDeltaColor = hasTotalMissingRate ? 'var(--t3)' : (totalDelta > 0 ? 'var(--g)' : (totalDelta < 0 ? 'var(--r)' : 'var(--t3)'));
-      h += '<td style="text-align:center;padding:6px;color:' + totalDeltaColor + '">';
-      if(hasTotalMissingRate){ h += '--'; } else { h += (totalDelta >= 0 ? '+' : '') + totalDelta.toFixed(2) + 'pp'; }
+      var totalBaseUseRate = totalBaseMetrics.use_rate;
+      var totalCompareUseRate = totalCompareMetrics.use_rate;
+      var hasTotalMissingUseRate = totalBaseUseRate === null || totalCompareUseRate === null;
+      var totalUseDelta = hasTotalMissingUseRate ? null : totalCompareUseRate - totalBaseUseRate;
+      var totalUseDeltaPct = hasTotalMissingUseRate ? null : (totalBaseUseRate > 0 ? (totalUseDelta / totalBaseUseRate * 100) : (totalCompareUseRate > 0 ? 100 : 0));
+      var totalUseColor = hasTotalMissingUseRate ? 'var(--t3)' : (totalUseDelta > 0 ? 'var(--g)' : (totalUseDelta < 0 ? 'var(--r)' : 'var(--t3)'));
+      var totalUseIcon = hasTotalMissingUseRate ? '−' : (totalUseDelta > 0 ? '▲' : (totalUseDelta < 0 ? '▼' : '−'));
+
+      var totalBaseConvertRate = totalBaseMetrics.convert_rate;
+      var totalCompareConvertRate = totalCompareMetrics.convert_rate;
+      var hasTotalMissingConvertRate = totalBaseConvertRate === null || totalCompareConvertRate === null;
+      var totalConvertDelta = hasTotalMissingConvertRate ? null : totalCompareConvertRate - totalBaseConvertRate;
+      var totalConvertDeltaPct = hasTotalMissingConvertRate ? null : (totalBaseConvertRate > 0 ? (totalConvertDelta / totalBaseConvertRate * 100) : (totalCompareConvertRate > 0 ? 100 : 0));
+      var totalConvertColor = hasTotalMissingConvertRate ? 'var(--t3)' : (totalConvertDelta > 0 ? 'var(--g)' : (totalConvertDelta < 0 ? 'var(--r)' : 'var(--t3)'));
+      var totalConvertIcon = hasTotalMissingConvertRate ? '−' : (totalConvertDelta > 0 ? '▲' : (totalConvertDelta < 0 ? '▼' : '−'));
+
+      h += '<td style="text-align:center;padding:6px;color:' + totalUseColor + '">';
+      if(hasTotalMissingUseRate){ h += '--'; } else { h += totalUseIcon + ' ' + Math.abs(totalUseDeltaPct).toFixed(2) + '%'; }
       h += '</td>';
-      h += '<td style="text-align:center;padding:6px;color:' + totalDeltaColor + '">';
-      if(hasTotalMissingRate){ h += '--'; } else { h += (totalDelta > 0 ? '▲' : (totalDelta < 0 ? '▼' : '−')) + ' ' + Math.abs(totalDeltaPct).toFixed(2) + '%'; }
+      h += '<td style="text-align:center;padding:6px;color:' + totalConvertColor + '">';
+      if(hasTotalMissingConvertRate){ h += '--'; } else { h += totalConvertIcon + ' ' + Math.abs(totalConvertDeltaPct).toFixed(2) + '%'; }
       h += '</td>';
     });
     h += '</tr>';
@@ -5160,7 +5229,8 @@ function buildDimYoyContent(dim, data){
 // ===== 分维度对比-基期选择渲染（下拉替代日期输入）=====
 function renderDimYoyPhaseSelect(comparePhases){
   var phases = D.phases || {};
-  var currentPhase = (ACT['phase'] && ACT['phase'][0]) || '';
+  // 使用 buildDimYoyContent 推断的实际现期阶段，避免左侧未选阶段时 currentPhase 为空导致可选中现期
+  var currentPhase = window._DIM_BASE_PHASE || (ACT['phase'] && ACT['phase'][0]) || '';
   var h = '';
 
   comparePhases.forEach(function(cp, i){
@@ -5180,16 +5250,29 @@ function renderDimYoyPhaseSelect(comparePhases){
   });
   h += '<div style="display:flex;align-items:center;gap:12px;margin-top:8px">';
   h += '<button onclick="addDimComparePhase()" style="padding:4px 16px;border:1px solid var(--blue);border-radius:6px;color:var(--blue);background:var(--w);cursor:pointer;font-size:12px;font-weight:600">+ 添加基期</button>';
-  if(comparePhases.length > 0 && comparePhases.every(function(p){ return p; })){
+  if(comparePhases.length > 0){
     h += '<button onclick="onDimYoyConfirm()" style="padding:4px 16px;border:1px solid var(--blue);border-radius:6px;background:var(--blue);color:#fff;cursor:pointer;font-size:12px;font-weight:600">✓ 确认对比</button>';
   }
   h += '</div>';
-  h += '<div style="margin-top:8px;font-size:11px;color:var(--t3)">💡 左侧阶段筛选 = 现期。此处从已有阶段中选择基期进行对比。</div>';
+  h += '<div style="margin-top:8px;font-size:11px;color:var(--t3)">💡 左侧阶段筛选 = 现期。此处从已有阶段中选择基期进行对比，基期不能与现期相同。</div>';
   return h;
 }
 
+function getDimCompareAvailablePhases(){
+  var phases = D.phases || {};
+  var currentPhase = window._DIM_BASE_PHASE || (ACT['phase'] && ACT['phase'][0]) || '';
+  var used = {};
+  (DIM_TIME_COMPARE.comparePhases || []).forEach(function(p){ if(p) used[p] = true; });
+  return Object.keys(phases).sort().filter(function(ph){ return ph !== currentPhase && !used[ph]; });
+}
+
 function addDimComparePhase(){
-  DIM_TIME_COMPARE.comparePhases.push('');
+  var available = getDimCompareAvailablePhases();
+  if(available.length > 0){
+    DIM_TIME_COMPARE.comparePhases.push(available[0]);
+  } else {
+    DIM_TIME_COMPARE.comparePhases.push('');
+  }
   showDimYoyTab(true);
 }
 function removeDimComparePhase(idx){
@@ -5197,10 +5280,20 @@ function removeDimComparePhase(idx){
   showDimYoyTab(true);
 }
 function updateDimComparePhase(idx, val){
+  var currentPhase = window._DIM_BASE_PHASE || (ACT['phase'] && ACT['phase'][0]) || '';
+  if(val && val === currentPhase){
+    // 禁止选择和现期相同的阶段作为基期，避免对比数据完全相同
+    alert('基期不能与现期相同，请选择其他阶段。');
+    showDimYoyTab(true);
+    return;
+  }
   DIM_TIME_COMPARE.comparePhases[idx] = val;
   showDimYoyTab(true);
 }
 function onDimYoyConfirm(){
+  // 清理空字符串并去重
+  var seen = {};
+  DIM_TIME_COMPARE.comparePhases = DIM_TIME_COMPARE.comparePhases.filter(function(p){ return !!p; }).filter(function(p){ if(seen[p]) return false; seen[p] = true; return true; });
   showDimYoyTab(true);
 }
 
@@ -5745,8 +5838,8 @@ function getPracticeMetricRows(data){
   }).filter(function(row){ return row !== null; });
 }
 
-function getModuleMetricRows(data){
-  var phase=resolveDimensionPhase(data)||Object.keys(D.phases||{})[0]||'';
+function getModuleMetricRows(data, forcePhase){
+  var phase=forcePhase||resolveDimensionPhase(data)||Object.keys(D.phases||{})[0]||'';
   var categories=(D.dimension_data&&D.dimension_data.resource_category)||[];
   var stage=(ACT.stage&&ACT.stage[0])||'', course=(ACT.course&&ACT.course[0])||'', grade=(ACT.grade&&ACT.grade[0])||'', version=(ACT.version&&ACT.version[0])||'';
   var scope=getDimensionScope('resource');
