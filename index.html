@@ -530,8 +530,8 @@ function isNormalBusinessFeature(metric, value, data){
 
 // 格式化指标值
 function formatMetricValue(metric, value){
-  if(metric === 'convert_rate' || metric === 'use_rate') return value + '%';
-  if(typeof value === 'number' && value >= 1e4) return (value / 1e4).toFixed(1) + '万';
+  if(metric === 'convert_rate' || metric === 'use_rate') return (Number(value)).toFixed(2) + '%';
+  if(typeof value === 'number' && value >= 1e4) return (value / 1e4).toFixed(2) + '万';
   if(typeof value === 'number') return value.toLocaleString();
   return String(value);
 }
@@ -1744,7 +1744,7 @@ window.addEventListener('resize', resizeCharts);
 
 function fmt(n){ return n!=null && !isNaN(n) ? Number(n).toLocaleString() : '0'; }
 function esc(s){ return s!=null ? String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,'&#39;').replace(/</g,'&lt;').replace(/>/g,'&gt;') : ''; }
-function sv(v,d){ d=d||0; if(v===null || v===undefined || v==='' || isNaN(v) || v===Infinity) return '--'; return v>=1e4?(v/1e4).toFixed(d)+'万':v.toLocaleString(); }
+function sv(v,d){ d=d||0; if(v===null || v===undefined || v==='' || isNaN(v) || v===Infinity) return '--'; return v>=1e4?(v/1e4).toFixed(2)+'万':v.toLocaleString(); }
 
 // ===== 安全值处理函数（新增）=====
 /**
@@ -2053,7 +2053,7 @@ return rate !== null ? {value: rate, status: 'ok'} : {value: null, status: 'miss
 function fmtUseRateV2(rate, missingInfo) {
 if (missingInfo) return '<span style="color:var(--r);font-size:11px" title="缺少' + esc(missingInfo) + '数据">缺少数据(缺少' + esc(missingInfo) + ')</span>';
 if (rate === null || rate === undefined || isNaN(rate)) return '--';
-return rate + '%';
+return Number(rate).toFixed(2) + '%';
 }
 function missingDataHint(fieldName) {
 return '<span style="color:var(--r);font-size:11px" title="该维度缺少' + esc(fieldName) + '数据">缺少数据(缺少' + esc(fieldName) + ')</span>';
@@ -2156,10 +2156,7 @@ function fmtUseRate(rate) {
   if (rate === null || rate === undefined || rate === '' || !Number.isFinite(Number(rate))) return '--';
   var num = parseFloat(rate);
   if (isNaN(num)) return '--';
-  var str = num.toFixed(2);
-  if (str.endsWith('.00')) str = str.slice(0, -3);
-  else if (str.endsWith('0')) str = str.slice(0, -1);
-  return str + '%';
+  return num.toFixed(2) + '%';
 }
 
 // 模块/分类矩阵专用：null/NaN 显示"--"（数据不足），否则显示"X%"
@@ -2167,10 +2164,7 @@ function fmtPctOrDash(v) {
   if (v === null || v === undefined || v === '' || !Number.isFinite(Number(v))) return '<span style="color:var(--t3)">--</span>';
   var num = parseFloat(v);
   if (isNaN(num)) return '<span style="color:var(--t3)">--</span>';
-  var str = num.toFixed(2);
-  if (str.endsWith('.00')) str = str.slice(0, -3);
-  else if (str.endsWith('0')) str = str.slice(0, -1);
-  return str + '%';
+  return num.toFixed(2) + '%';
 }
 
 /**
@@ -2180,10 +2174,7 @@ function fmtPct(v) {
   if (v === null || v === undefined || v === '' || !Number.isFinite(Number(v))) return '--';
   var num = parseFloat(v);
   if (isNaN(num)) return '--';
-  var str = num.toFixed(2);
-  if (str.endsWith('.00')) str = str.slice(0, -3);
-  else if (str.endsWith('0')) str = str.slice(0, -1);
-  return str + '%';
+  return num.toFixed(2) + '%';
 }
 
 /**
@@ -2434,7 +2425,7 @@ function calcAvgPv(data){
   var totalPv = 0, totalUv = 0;
   var hasDetail = data.some(function(r){ return r.aggLevel !== 's'; });
   data.forEach(function(r){ if(hasDetail && r.aggLevel==='s') return; totalPv += r.pv || 0; totalUv += r.uv || 0; });
-  return totalUv > 0 ? (totalPv / totalUv).toFixed(1) : 0;
+  return totalUv > 0 ? (totalPv / totalUv).toFixed(2) : 0;
 }
 
 /**
@@ -2553,20 +2544,22 @@ function getKpUv(dim, name, phase){
   return getKpMetric(dim, name, 'uv', phase);
 }
 function analyzeCourseInsight(data){
-  var cs = aggBy(data, 'course');
+  var phase = (ACT['phase']&&ACT['phase'][0]) || '';
+  // 行名来自 aggByStageCourse（学段+学科，纯汇总阶段已从 kp 取）；实际指标一律走 kp，绝不累加明细（v7.6）
+  var cs = aggByStageCourse(data).slice(0,15);
   if(cs.length === 0) return null;
 
-  // 计算每个学科的使用率和转化率
   var courseMetrics = {};
   cs.forEach(function(c){
-    var courseData = data.filter(function(r){ return r.course === c.name; });
-    var uv = getKpUv('course', c.name);   // UV 去重：查 kp，无则 null
-    var use = getKpMetric('course', c.name, 'use_users');
-    var dl = getKpMetric('course', c.name, 'dl');
+    var pv = getKpMetric('course', c.name, 'pv', phase);
     courseMetrics[c.name] = {
-      pv: c.pv, uv: uv !== null ? uv : 0, use: use !== null ? use : 0, dl: dl !== null ? dl : 0, ct: c.ct,
-      useRate: calcUseRate(courseData, {course: c.name, stage: (ACT['stage']||[])[0] || ''}),
-      convertRate: calcConvertRate(courseData, {course: c.name, stage: (ACT['stage']||[])[0] || ''})
+      pv: (pv !== null) ? pv : c.pv,
+      uv: getKpMetric('course', c.name, 'uv', phase),
+      use: getKpMetric('course', c.name, 'use_users', phase),
+      dl: getKpMetric('course', c.name, 'dl', phase),
+      ct: c.ct,
+      useRate: getKpMetric('course', c.name, 'use_rate', phase),
+      convertRate: getKpMetric('course', c.name, 'convert_rate', phase)
     };
   });
 
@@ -2585,23 +2578,22 @@ function analyzeCourseInsight(data){
 
 // ===== 模块洞察分析 =====
 function analyzeModuleInsight(data){
-  var mod = aggBy(data, 'module').filter(function(m){ return m.name && m.name !== '阶段复习' && m.name !== '假期综合' && m.name !== '同步学习' && m.name !== '备考冲刺'; });
-  if(mod.length === 0) return null;
-
+  // 资源分类 全部指标从 kp 资源分类聚合取（阶段::资源分类-{name}），绝不累加明细（v7.6）
+  var rows = getModuleMetricRows(data);
+  if(!rows || rows.length === 0) return null;
   var moduleMetrics = {};
-  mod.forEach(function(m){
-    var modData = data.filter(function(r){ return r.module === m.name; });
-    var uv = 0, use = 0, dl = 0;
-    modData.forEach(function(r){ uv += r.uv || 0; use += r.total_users || 0; dl += getDownloadCount(r); });
-    moduleMetrics[m.name] = {
-      pv: m.pv, uv: uv, use: use, dl: dl, ct: m.ct,
-      useRate: calcUseRate(modData, {module: m.name}),
-      convertRate: calcConvertRate(modData, {module: m.name})
+  rows.forEach(function(r){
+    if(!r.pv) return;
+    moduleMetrics[r.name] = {
+      pv: r.pv, uv: r.uv, use: r.use_users, dl: r.dl, ct: r.ct,
+      useRate: r.use_rate, convertRate: r.convert_rate
     };
   });
+  var names = Object.keys(moduleMetrics);
+  if(names.length === 0) return null;
 
-  var sortedByUseRate = Object.keys(moduleMetrics).filter(function(k){ return moduleMetrics[k].useRate !== null && !isNaN(moduleMetrics[k].useRate); }).sort(function(a,b){ return moduleMetrics[b].useRate - moduleMetrics[a].useRate; });
-  var sortedByConvert = Object.keys(moduleMetrics).filter(function(k){ return moduleMetrics[k].convertRate !== null && !isNaN(moduleMetrics[k].convertRate); }).sort(function(a,b){ return moduleMetrics[b].convertRate - moduleMetrics[a].convertRate; });
+  var sortedByUseRate = names.filter(function(k){ return moduleMetrics[k].useRate !== null && !isNaN(moduleMetrics[k].useRate); }).sort(function(a,b){ return moduleMetrics[b].useRate - moduleMetrics[a].useRate; });
+  var sortedByConvert = names.filter(function(k){ return moduleMetrics[k].convertRate !== null && !isNaN(moduleMetrics[k].convertRate); }).sort(function(a,b){ return moduleMetrics[b].convertRate - moduleMetrics[a].convertRate; });
 
   return {
     metrics: moduleMetrics,
@@ -2614,20 +2606,26 @@ function analyzeModuleInsight(data){
 
 // ===== 学段洞察分析 =====
 function analyzeStageInsight(data){
-  var st = aggBy(data, 'stage').filter(function(s){ return s.name && s.name !== '未知' && s.name !== 'nan'; });
-  if(st.length === 0) return null;
-
+  var phase = (ACT['phase']&&ACT['phase'][0]) || '';
+  // 学段 PV/UV/使用率 全部从 kp 阶段内学段聚合取（阶段::场景-学段（XX）），绝不累加明细（v7.6）
+  var stages = (ACT['stage']&&ACT['stage'][0]) ? [ACT['stage'][0]] : ['小学','初中','高中'];
   var stageMetrics = {};
-  st.forEach(function(s){
-    var stageData = data.filter(function(r){ return r.stage === s.name; });
-    var uv = 0, use = 0, dl = 0;
-    stageData.forEach(function(r){ uv += r.uv || 0; use += r.total_users || 0; dl += getDownloadCount(r); });
-    stageMetrics[s.name] = {
-      pv: s.pv, uv: uv, use: use, dl: dl, ct: s.ct,
-      useRate: calcUseRate(stageData, {stage: s.name}),
-      convertRate: calcConvertRate(stageData, {stage: s.name})
+  var valid = 0;
+  stages.forEach(function(sn){
+    var pv = getKpMetric('stage', sn, 'pv', phase);
+    if(pv === null || pv === 0) return;
+    valid++;
+    stageMetrics[sn] = {
+      pv: pv,
+      uv: getKpMetric('stage', sn, 'uv', phase),
+      use: getKpMetric('stage', sn, 'use_users', phase),
+      dl: getKpMetric('stage', sn, 'dl', phase),
+      ct: getKpMetric('stage', sn, 'rc', phase),
+      useRate: getKpMetric('stage', sn, 'use_rate', phase),
+      convertRate: getKpMetric('stage', sn, 'convert_rate', phase)
     };
   });
+  if(valid === 0) return null;
 
   var sortedByUseRate = Object.keys(stageMetrics).filter(function(k){ return stageMetrics[k].useRate !== null && !isNaN(stageMetrics[k].useRate); }).sort(function(a,b){ return stageMetrics[b].useRate - stageMetrics[a].useRate; });
   var sortedByPv = Object.keys(stageMetrics).sort(function(a,b){ return stageMetrics[b].pv - stageMetrics[a].pv; });
@@ -3218,7 +3216,7 @@ function buildCompareTable(years){
     vals.forEach(function(v){ h += '<td class="num">'+sv(v,1)+'</td>'; });
     if(keys.length===2){
       var delta = vals[1]-vals[0];
-      var pct = vals[0]>0?((delta/vals[0])*100).toFixed(1)+'%':'--';
+      var pct = vals[0]>0?((delta/vals[0])*100).toFixed(2)+'%':'--';
       h += '<td class="num '+(delta>=0?'up':'down')+'">'+(delta>=0?'+':'')+sv(delta,1)+'</td>';
       h += '<td class="num '+(delta>=0?'up':'down')+'">'+pct+'</td>';
     }
@@ -3285,7 +3283,7 @@ function buildPhaseYoyTable(phase, phaseYoy, yrs){
     vals.forEach(function(v){ h += '<td class="num">'+sv(v,1)+'</td>'; });
     if(yrs.length===2){
       var delta = vals[1]-vals[0];
-      var pct = vals[0]>0?((delta/vals[0])*100).toFixed(1)+'%':'--';
+      var pct = vals[0]>0?((delta/vals[0])*100).toFixed(2)+'%':'--';
       h += '<td class="num '+(delta>=0?'up':'down')+'">'+(delta>=0?'+':'')+sv(delta,1)+'</td>';
       h += '<td class="num '+(delta>=0?'up':'down')+'">'+pct+'</td>';
     }
@@ -3395,7 +3393,7 @@ function buildCoreMetricsYoyCards(data){
           var color=missing?'var(--t3)':(delta>0?'var(--g)':(delta<0?'var(--r)':'var(--t3)'));
           h += '<td style="text-align:center;font-weight:600;color:'+color+'">'+(missing?'--':((delta>=0?'▲ ':'▼ ')+Math.abs(delta).toFixed(2)+'pp'))+'</td>';
         } else {
-          var bnum=Number(bv)||0, cnum=Number(cv)||0, d=cnum-bnum, pct=bnum>0?((d/bnum)*100).toFixed(1)+'%':(cnum>0?'新增':'0%');
+          var bnum=Number(bv)||0, cnum=Number(cv)||0, d=cnum-bnum, pct=bnum>0?((d/bnum)*100).toFixed(2)+'%':(cnum>0?'新增':'0.00%');
           var color2=d>0?'var(--g)':(d<0?'var(--r)':'var(--t3)');
           h += '<td style="text-align:center;font-weight:600;color:'+color2+'">'+(d>=0?'▲ ':'▼ ')+sv(Math.abs(d),1)+' ('+pct+')</td>';
         }
@@ -3717,7 +3715,7 @@ function buildYoyKpiCards(years, keys){
     var currVal = curr[m.key] || 0;
     var prevVal = prev[m.key] || 0;
     var delta = currVal - prevVal;
-    var pct = prevVal > 0 ? ((delta / prevVal) * 100).toFixed(1) : (currVal > 0 ? '新增' : '0');
+    var pct = prevVal > 0 ? ((delta / prevVal) * 100).toFixed(2) : (currVal > 0 ? '新增' : '0.00');
     var isUp = delta >= 0;
     var pctStr = typeof pct === 'number' || pct.indexOf('%') >= 0 ? pct : pct;
     if(typeof pct === 'number') pctStr = pct + '%';
@@ -3968,7 +3966,7 @@ function renderCategorySceneCell(value, currentMetric, cfg, color, cat, sc, isBa
   var html = '<td style="text-align:center;padding:10px' + (isBase ? '' : ';background:var(--s)') + '"' + clickable + '>';
   if(isZero){
     html += '<div style="font-size:11px;color:var(--t3)">无数据</div>';
-    html += '<div style="font-size:13px;color:var(--r);font-weight:600">0%</div>';
+    html += '<div style="font-size:13px;color:var(--r);font-weight:600">0.00%</div>';
     html += '<div style="font-size:10px;color:var(--r)">⚠️点击了解</div>';
   } else {
     html += '<div style="font-size:16px;font-weight:700;color:' + color + '">' + cfg.fmt(value) + '</div>';
@@ -4869,6 +4867,27 @@ var DIM_TIME_COMPARE = {
   chartMetrics: []
 };
 
+// 分维度时间对比：从 kp 取某阶段某维度的全部聚合行，绝不累加明细（v7.6）
+function getDimYoyRows(dim, phase){
+  var kpData = D.kp || {};
+  var pref = phase ? phase+'::' : '';
+  var rows = [];
+  var seen = {};
+  Object.keys(kpData).forEach(function(k){
+    if(pref && k.indexOf(pref) !== 0) return;
+    var sk = pref ? k.slice(pref.length) : k;
+    var name = null;
+    if(dim === 'stage'){
+      var m=sk.match(/^场景-学段（(小学|初中|高中)）$/); if(m) name=m[1];
+      else if(/^(小学|初中|高中)$/.test(sk)) name=sk;  // 兼容旧管线无前缀格式（如 24-25 阶段的「初中」）
+    }
+    else if(dim === 'grade'){ var m=sk.match(/^年级-(.+)$/); if(m) name=m[1]; }
+    else if(dim === 'version'){ var m=sk.match(/^版本-(.+)$/); if(m) name=m[1]; }
+    if(name && !seen[name]){ seen[name]=true; var kp=kpData[k]; rows.push({name:name,pv:kp.pv||0,uv:kp.uv||0,dl:kp.dl||0,ct:kp.rc||0,useUsers:kp.use_users||0,paidUsers:kp.paid_users||0}); }
+  });
+  return rows;
+}
+
 // 构建维度分析页的时间对比内容（基期从已有阶段下拉选择）
 function buildDimYoyContent(dim, data){
   var dimLabels = {course:'学科', grade:'年级', version:'版本', module:'资源分类', category:'板块'};
@@ -4907,16 +4926,15 @@ function buildDimYoyContent(dim, data){
   // ⚠️ 学科维度必须按 学段+学科 分组（初中化学≠高中化学），不能直接用 aggBy(course) 跨学段累加。
   var baseAgg, compareAggList;
   if(dim === 'category'){
-    baseAgg = aggByCategory(baseData).filter(function(item){
-      return item.name && item.name !== '未知' && item.name !== 'nan' && item.name !== '';
+    // 资源分类（板块）全部从 kp 取（阶段::资源分类-{name}），绝不累加明细（v7.6）
+    baseAgg = getModuleMetricRows(baseData).filter(function(item){ return item.name && item.name !== '' && item.pv; }).map(function(item){
+      return {name:item.name, pv:item.pv, uv:item.uv, dl:item.dl, ct:item.ct, useUsers:item.use_users};
     });
   } else if(dim === 'course'){
     baseAgg = aggByStageCourse(baseData);
   } else {
-    baseAgg = aggBy(baseData, dim).filter(function(item){
-      return item.name && item.name !== '未知' && item.name !== 'nan' && item.name !== '' &&
-             item.name !== '阶段复习' && item.name !== '假期综合' && item.name !== '同步学习' && item.name !== '备考冲刺';
-    });
+    // grade/version/stage 从 kp 扫描取现成聚合（v7.6）
+    baseAgg = getDimYoyRows(dim, basePhase);
   }
 
   // 汇总各基期数据
@@ -4926,16 +4944,13 @@ function buildDimYoyContent(dim, data){
     var cpData = rawCpData.filter(function(r){ return cpHasAnyDetail ? r.aggLevel !== 's' : true; });
     var agg;
     if(dim === 'category'){
-      agg = aggByCategory(cpData).filter(function(item){
-        return item.name && item.name !== '未知' && item.name !== 'nan' && item.name !== '';
+      agg = getModuleMetricRows(cpData).filter(function(item){ return item.name && item.name !== '' && item.pv; }).map(function(item){
+        return {name:item.name, pv:item.pv, uv:item.uv, dl:item.dl, ct:item.ct, useUsers:item.use_users};
       });
     } else if(dim === 'course'){
       agg = aggByStageCourse(cpData);
     } else {
-      agg = aggBy(cpData, dim).filter(function(item){
-        return item.name && item.name !== '未知' && item.name !== 'nan' && item.name !== '' &&
-               item.name !== '阶段复习' && item.name !== '假期综合' && item.name !== '同步学习' && item.name !== '备考冲刺';
-      });
+      agg = getDimYoyRows(dim, cp);
     }
     return {agg: agg, dataCount: cpData.length, hasDetail: cpHasAnyDetail};
   });
@@ -5053,15 +5068,15 @@ function buildDimYoyContent(dim, data){
       var compareRate = compareMetrics.use_rate;
       var hasMissingRate = baseRate === null || compareRate === null;
       var delta = hasMissingRate ? null : compareRate - baseRate;
-      var deltaPct = hasMissingRate ? null : (baseRate > 0 ? Math.round(delta / baseRate * 100) : (compareRate > 0 ? 100 : 0));
+      var deltaPct = hasMissingRate ? null : (baseRate > 0 ? (delta / baseRate * 100) : (compareRate > 0 ? 100 : 0));
       var deltaColor = hasMissingRate ? 'var(--t3)' : (delta > 0 ? 'var(--g)' : (delta < 0 ? 'var(--r)' : 'var(--t3)'));
       var deltaIcon = hasMissingRate ? '−' : (delta > 0 ? '▲' : (delta < 0 ? '▼' : '−'));
 
       h += '<td style="text-align:center;padding:6px;font-weight:600;color:' + deltaColor + '">';
-      if(hasMissingRate){ h += '--'; } else { h += (delta >= 0 ? '+' : '') + delta + 'pp'; }
+      if(hasMissingRate){ h += '--'; } else { h += (delta >= 0 ? '+' : '') + delta.toFixed(2) + 'pp'; }
       h += '</td>';
       h += '<td style="text-align:center;padding:6px;font-weight:600;color:' + deltaColor + '">';
-      if(hasMissingRate){ h += '--'; } else { h += deltaIcon + ' ' + Math.abs(deltaPct) + '%'; }
+      if(hasMissingRate){ h += '--'; } else { h += deltaIcon + ' ' + Math.abs(deltaPct).toFixed(2) + '%'; }
       h += '</td>';
     });
 
@@ -5107,13 +5122,13 @@ function buildDimYoyContent(dim, data){
       var totalCompareRate = totalCompareMetrics.use_rate;
       var hasTotalMissingRate = totalBaseRate === null || totalCompareRate === null;
       var totalDelta = hasTotalMissingRate ? null : totalCompareRate - totalBaseRate;
-      var totalDeltaPct = hasTotalMissingRate ? null : (totalBaseRate > 0 ? Math.round(totalDelta / totalBaseRate * 100) : (totalCompareRate > 0 ? 100 : 0));
+      var totalDeltaPct = hasTotalMissingRate ? null : (totalBaseRate > 0 ? (totalDelta / totalBaseRate * 100) : (totalCompareRate > 0 ? 100 : 0));
       var totalDeltaColor = hasTotalMissingRate ? 'var(--t3)' : (totalDelta > 0 ? 'var(--g)' : (totalDelta < 0 ? 'var(--r)' : 'var(--t3)'));
       h += '<td style="text-align:center;padding:6px;color:' + totalDeltaColor + '">';
-      if(hasTotalMissingRate){ h += '--'; } else { h += (totalDelta >= 0 ? '+' : '') + totalDelta + 'pp'; }
+      if(hasTotalMissingRate){ h += '--'; } else { h += (totalDelta >= 0 ? '+' : '') + totalDelta.toFixed(2) + 'pp'; }
       h += '</td>';
       h += '<td style="text-align:center;padding:6px;color:' + totalDeltaColor + '">';
-      if(hasTotalMissingRate){ h += '--'; } else { h += (totalDelta > 0 ? '▲' : (totalDelta < 0 ? '▼' : '−')) + ' ' + Math.abs(totalDeltaPct) + '%'; }
+      if(hasTotalMissingRate){ h += '--'; } else { h += (totalDelta > 0 ? '▲' : (totalDelta < 0 ? '▼' : '−')) + ' ' + Math.abs(totalDeltaPct).toFixed(2) + '%'; }
       h += '</td>';
     });
     h += '</tr>';
@@ -6167,12 +6182,14 @@ function renderCharts(data){
 function rOverview(){
   var data=getFiltered();
   var ps=D.ps||{}, psKeys=Object.keys(ps).sort();
-  var st=aggBy(data,'stage').filter(function(s){return s.name && s.name!=='未知' && s.name!=='nan';});
-  // 纯汇总阶段没有 detail 记录，按阶段 kp 补齐学段 PV 分布。
+  var stagePhase=(ACT['phase']&&ACT['phase'][0])||'';
+  if(!stagePhase && data.length > 0) stagePhase=data[0].phase||'';
+  // 学段 PV 分布必须取 kp 学段汇总（阶段::场景-学段（XX）/阶段::XX），
+  // 绝不能对明细按学段累加：同一学段跨学科/年级/版本的 PV 会重复计算，导致放大 5~10 倍。
+  var st=getStageDistributionFromKp(stagePhase).filter(function(s){return s.name && s.name!=='未知' && s.name!=='nan';});
+  // 兜底：只有 kp 完全缺失时才用明细聚合展示。
   if(st.length === 0){
-    var stagePhase=(ACT['phase']&&ACT['phase'][0])||'';
-    if(!stagePhase && data.length > 0) stagePhase=data[0].phase||'';
-    st=getStageDistributionFromKp(stagePhase);
+    st=aggBy(data,'stage').filter(function(s){return s.name && s.name!=='未知' && s.name!=='nan';});
   }
 
   // 从 kp 获取学段学科四维数据
@@ -6313,9 +6330,11 @@ function buildAIPrompt(opts, data){
   var convertRate = calcConvertRate(data, {});
 
   if(opts.type === 'overview'){
-    var topCourse = aggBy(data,'course').slice(0,5);
-    var topModule = aggBy(data,'module').slice(0,5);
-    var stageDist = aggBy(data,'stage');
+    var topCourse = aggByStageCourse(data).slice(0,5);
+    var topModule = getModuleMetricRows(data).filter(function(r){ return r.pv; }).slice(0,5);
+    var stagePhase=(ACT['phase']&&ACT['phase'][0])||'';
+    if(!stagePhase && data.length > 0) stagePhase=data[0].phase||'';
+    var stageDist = getStageDistributionFromKp(stagePhase);
     var avgPv = data.length > 0 ? Math.round(kpi.pv / data.length) : 0;
 
     var prompt = '你是一位教育数据分析师，请基于以下数据生成简洁有力的分析洞察。';
@@ -6324,8 +6343,8 @@ function buildAIPrompt(opts, data){
     prompt += '\n- 资源总数：' + data.length + '个';
     prompt += '\n- 总PV：' + kpi.pv.toLocaleString() + '，均PV：' + avgPv;
     prompt += '\n- 总UV：' + kpi.uv.toLocaleString();
-    prompt += '\n- 使用率：' + useRate + '%';
-    prompt += '\n- 付费转化率：' + convertRate + '%';
+    prompt += '\n- 使用率：' + fmtUseRate(useRate);
+    prompt += '\n- 付费转化率：' + fmtUseRate(convertRate);
     prompt += '\n- 总下载：' + kpi.dl.toLocaleString();
     prompt += '\n\nTOP5学科（按PV）：' + topCourse.map(function(c){return c.name + '(' + c.pv.toLocaleString() + ')';}).join('、');
     prompt += '\nTOP5资源分类（按PV）：' + topModule.map(function(m){return m.name + '(' + m.pv.toLocaleString() + ')';}).join('、');
@@ -6352,7 +6371,7 @@ function buildAIPrompt(opts, data){
     prompt += '\n\n当前分析维度：' + dimName;
     prompt += '\n- 资源总数：' + data.length + '个';
     prompt += '\n- 总PV：' + kpi.pv.toLocaleString() + '，总UV：' + kpi.uv.toLocaleString();
-    prompt += '\n- 整体使用率：' + useRate + '%';
+    prompt += '\n- 整体使用率：' + fmtUseRate(useRate);
     prompt += '\n\n' + dimName + '分布（按PV排序）：';
     dimData.forEach(function(d, i){
       prompt += '\n' + (i+1) + '. ' + d.name + '：PV ' + d.pv.toLocaleString() + '，UV ' + d.uv.toLocaleString() + '，资源数 ' + d.ct;
@@ -6368,7 +6387,7 @@ function buildAIPrompt(opts, data){
     prompt += '\n\n资源概况：';
     prompt += '\n- 资源总数：' + data.length + '个';
     prompt += '\n- 总PV：' + kpi.pv.toLocaleString() + '，总UV：' + kpi.uv.toLocaleString();
-    prompt += '\n- 均PV：' + avgPv + '，整体使用率：' + useRate + '%';
+    prompt += '\n- 均PV：' + avgPv + '，整体使用率：' + fmtUseRate(useRate);
     prompt += '\n\nTOP20资源明细：';
     topRes.forEach(function(r, i){
       prompt += '\n' + (i+1) + '. ' + (r.title || '未命名') + ' | ' + (r.course||'-') + ' | PV ' + r.pv + ' | UV ' + r.uv;
@@ -6456,9 +6475,11 @@ function generateLocalInsight(opts, data){
   var avgPv = data.length > 0 ? Math.round(kpi.pv / data.length) : 0;
 
   if(opts.type === 'overview'){
-    var topCourse = aggBy(data,'course').slice(0,5);
-    var topModule = aggBy(data,'module').slice(0,5);
-    var stageDist = aggBy(data,'stage');
+    var topCourse = aggByStageCourse(data).slice(0,5);
+    var topModule = getModuleMetricRows(data).filter(function(r){ return r.pv; }).slice(0,5);
+    var stagePhase=(ACT['phase']&&ACT['phase'][0])||'';
+    if(!stagePhase && data.length > 0) stagePhase=data[0].phase||'';
+    var stageDist = getStageDistributionFromKp(stagePhase);
 
     h += '<p><strong>📊 整体表现：</strong>当前' + data.length + '个资源总PV ' + kpi.pv.toLocaleString() + '，使用率 ' + useRate + '%，付费转化 ' + convertRate + '%。';
     if(useRate > 40) h += '整体<strong>使用率良好</strong>。';
@@ -6468,8 +6489,8 @@ function generateLocalInsight(opts, data){
 
     if(topCourse.length >= 2){
       var top1 = topCourse[0], top2 = topCourse[1];
-      var gapPct = top2.pv > 0 ? Math.round((top1.pv - top2.pv) / top2.pv * 100) : 0;
-      h += '<p><strong>📐 学科差异：</strong>' + top1.name + 'PV最高（' + top1.pv.toLocaleString() + '），领先' + top2.name + ' ' + gapPct + '%。';
+      var gapPct = top2.pv > 0 ? (top1.pv - top2.pv) / top2.pv * 100 : 0;
+      h += '<p><strong>📐 学科差异：</strong>' + top1.name + 'PV最高（' + top1.pv.toLocaleString() + '），领先' + top2.name + ' ' + gapPct.toFixed(2) + '%。';
       h += gapPct > 50 ? '学科间流量分布<strong>不均衡</strong>。' : '学科间流量分布<strong>相对均衡</strong>。';
       h += '</p>';
     }
@@ -6489,8 +6510,8 @@ function generateLocalInsight(opts, data){
     var dimData = aggBy(data, opts.dimTab === 'module' ? 'module' : opts.dimTab).slice(0,10);
     if(dimData.length >= 2){
       var top1 = dimData[0], top2 = dimData[1];
-      var gapPct = top2.pv > 0 ? Math.round((top1.pv - top2.pv) / top2.pv * 100) : 0;
-      h += '<p><strong>📊 ' + opts.dimName + '整体表现：</strong>' + top1.name + 'PV最高（' + top1.pv.toLocaleString() + '），领先' + top2.name + ' ' + gapPct + '%。';
+      var gapPct = top2.pv > 0 ? (top1.pv - top2.pv) / top2.pv * 100 : 0;
+      h += '<p><strong>📊 ' + opts.dimName + '整体表现：</strong>' + top1.name + 'PV最高（' + top1.pv.toLocaleString() + '），领先' + top2.name + ' ' + gapPct.toFixed(2) + '%。';
       h += gapPct > 100 ? opts.dimName + '间流量<strong>高度集中</strong>。' : (gapPct > 50 ? opts.dimName + '间流量<strong>不均衡</strong>。' : opts.dimName + '间流量<strong>相对均衡</strong>。');
       h += '</p>';
     }
@@ -6505,7 +6526,7 @@ function generateLocalInsight(opts, data){
     h += '</p>';
     var lowRes = data.filter(function(r){return r.pv < avgPv / 2;});
     if(lowRes.length > 0){
-      h += '<p><strong>⚠️ 长尾资源关注：</strong>' + Math.round(lowRes.length / data.length * 100) + '%的资源PV低于均值一半。建议进行<strong>标题优化</strong>或<strong>内容重组</strong>。</p>';
+      h += '<p><strong>⚠️ 长尾资源关注：</strong>' + (lowRes.length / data.length * 100).toFixed(2) + '%的资源PV低于均值一半。建议进行<strong>标题优化</strong>或<strong>内容重组</strong>。</p>';
     }
   }
 
