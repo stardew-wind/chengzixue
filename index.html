@@ -67,6 +67,13 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Noto Sans SC',sans
 .detail-table th.sortable.sort-asc::after{content:'▲';color:var(--blue);opacity:1}
 .detail-table th.sortable.sort-desc::after{content:'▼';color:var(--blue);opacity:1}
 .detail-table th.sort-asc,.detail-table th.sort-desc{background:#DBEAFE;color:var(--blue)}
+/* 分维度明细表：可点击排序表头（逻辑与资源明细一致：新列默认倒序，同列再次点击切换正/倒序） */
+.data-table.module-matrix-table th.sortable{cursor:pointer;user-select:none;transition:.15s}
+.data-table.module-matrix-table th.sortable:hover{background:#E2E8F0;color:var(--blue)}
+.data-table.module-matrix-table th.sortable::after{content:'⇅';font-size:10px;color:var(--t3);margin-left:4px;opacity:.5}
+.data-table.module-matrix-table th.sortable.sort-asc::after{content:'▲';color:var(--blue);opacity:1}
+.data-table.module-matrix-table th.sortable.sort-desc::after{content:'▼';color:var(--blue);opacity:1}
+.data-table.module-matrix-table th.sort-asc,.data-table.module-matrix-table th.sort-desc{background:#DBEAFE;color:var(--blue)}
 .detail-table td{padding:8px 12px;text-align:center;border-bottom:1px solid var(--b);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .detail-table td.name{text-align:left}
 .detail-table td.num{text-align:right;font-variant-numeric:tabular-nums}
@@ -5515,6 +5522,48 @@ function dimTh(label, note){
   return label + '<br><span style="font-size:11px;font-weight:400;color:var(--t3)">' + note + '</span>';
 }
 
+// 分维度表格可点击排序表头：key 为空表示不可排序（如名称列），否则绑定 onclick 排序
+function dimSortTh(label, note, key, defaultDesc){
+  if(!key){
+    return '<th>' + label + (note ? '<br><span style="font-size:11px;font-weight:400;color:var(--t3)">' + note + '</span>' : '') + '</th>';
+  }
+  var cls = ' class="sortable' + (defaultDesc ? ' sort-desc' : '') + '"';
+  return '<th' + cls + ' data-sort-key="' + key + '" onclick="sortDimTable(this,\'' + key + '\')">' +
+    label + (note ? '<br><span style="font-size:11px;font-weight:400;color:var(--t3)">' + note + '</span>' : '') + '</th>';
+}
+// 分维度表格可排序单元格：sortVal 为数值排序键（缺失用 -1 沉底），display 为展示 HTML
+function dimSortTd(sortVal, display){
+  var s = (sortVal === null || sortVal === undefined || isNaN(sortVal)) ? -1 : sortVal;
+  return '<td data-sort="' + s + '">' + display + '</td>';
+}
+// 分维度表格排序（通用，作用于最近的 .module-matrix-table）：与资源明细 sortDetailTable 一致
+// 新点击列默认倒序；再次点击同一列则切换正/倒序
+function sortDimTable(thEl, key){
+  var table = thEl.closest('table');
+  if(!table) return;
+  var ths = table.querySelectorAll('thead th');
+  var tbody = table.querySelector('tbody');
+  if(!tbody) return;
+  var rows = Array.prototype.slice.call(tbody.querySelectorAll('tr'));
+  var colIndex = -1, currentKey = null;
+  ths.forEach(function(th, idx){
+    if(th.getAttribute('data-sort-key') === key) colIndex = idx;
+    if(th.classList.contains('sort-asc') || th.classList.contains('sort-desc')) currentKey = th.getAttribute('data-sort-key');
+  });
+  if(colIndex < 0) return;
+  var isSame = currentKey === key;
+  var wantDesc = true;
+  if(isSame) wantDesc = !ths[colIndex].classList.contains('sort-desc');
+  ths.forEach(function(th){ th.classList.remove('sort-asc','sort-desc'); });
+  ths[colIndex].classList.add(wantDesc ? 'sort-desc' : 'sort-asc');
+  rows.sort(function(a,b){
+    var av = parseFloat((a.cells[colIndex] && a.cells[colIndex].getAttribute('data-sort')) || 0) || 0;
+    var bv = parseFloat((b.cells[colIndex] && b.cells[colIndex].getAttribute('data-sort')) || 0) || 0;
+    return wantDesc ? bv - av : av - bv;
+  });
+  rows.forEach(function(r){ tbody.appendChild(r); });
+}
+
 // 构建资源分类统一指标：表格与六张图必须共用此口径。
 // PV/下载/资源数可由明细聚合；UV/使用人数/付费人数只能来自精确模块KP，禁止明细累加。
 function resolveDimensionPhase(data){
@@ -5573,12 +5622,7 @@ function getModuleMetricRows(data, forcePhase){
   if(scope===null) return categories.map(function(name){return {name:name,pv:0,uv:null,use_users:null,paid_users:null,use_rate:null,convert_rate:null,dl:0,ct:0};});
   return categories.map(function(name){
     var key=phase+'::资源分类-'+(scope?scope+'-':'')+name, kp=(D.kp||{})[key];
-    // 纯汇总阶段可能只有“资源分类-分类”或“资源分类-学段-分类”键，按当前scope逐级查找。
-    if(!kp && scope){
-      var candidates=[phase+'::资源分类-'+scope+'-'+name];
-      if(stage) candidates.push(phase+'::资源分类-'+stage+'-'+name);
-      for(var ci=0;ci<candidates.length && !kp;ci++) kp=(D.kp||{})[candidates[ci]];
-    }
+    // 仅当未选次级维度（scope 为空=只选学段）时才做旧管线前缀兼容；已选学科/年级/版本时绝不回退到更粗层级，避免非当前筛选维度的数据混入
     // 全局汇总阶段：旧管线大盘 sheet 直接生成 "阶段::PDF文档"，未加 "资源分类-" 前缀，做兼容回退
     if(!kp && !scope){
       kp = (D.kp||{})[phase+'::'+name] || (D.kp||{})[phase+'::资源分类-'+name] || null;
@@ -5597,7 +5641,8 @@ function getModuleMetricRows(data, forcePhase){
       });
       kp = agg;
     }
-    if(!kp) return null;
+    // 精确维度缺失：返回“数据不足”占位（不回退、不混入更粗层级数据）
+    if(!kp) return {name:name,pv:0,uv:null,use_users:null,paid_users:null,use_rate:null,convert_rate:null,dl:0,ct:0,missing:true};
     return {name:name,pv:kp.pv||0,uv:kp.uv,use_users:kp.use_users,paid_users:kp.paid_users,use_rate:safeUseRate(kp.use_users,kp.uv),convert_rate:safeConvertRateFromUv(kp.paid_users,kp.uv),dl:kp.dl||0,ct:kp.rc||0};
   }).filter(function(row){ return row !== null; });
 }
@@ -5783,7 +5828,8 @@ function buildDimContent(tab, data){
     var courseScopeNote = courseScopeTxt ? '（学段+学科；含额外切片时去重指标为"数据不足"' + courseScopeTxt + '）' : '（学段+学科）';
 
     h += buildDimMetricCharts('course', '📐 学段学科');
-    h += '<div class="box"><div class="box-hd"><span class="box-ttl">📋 学段学科明细 TOP15 <span style="font-size:11px;font-weight:400;color:var(--t3)">'+courseScopeNote+'</span></span></div><div class="tbl-wrap"><table class="data-table module-matrix-table"><thead><tr><th style="width:18%">📐 学段学科</th><th style="width:12%">' + dimTh('PV', DIM_TH_NOTE.pv) + '</th><th style="width:12%">' + dimTh('UV', DIM_TH_NOTE.uv) + '</th><th style="width:11%">' + dimTh('使用人数','去重使用用户数') + '</th><th style="width:11%">' + dimTh('付费人数','去重付费用户数') + '</th><th style="width:12%">' + dimTh('使用率', DIM_TH_NOTE.useRate) + '</th><th style="width:14%">' + dimTh('付费转化', DIM_TH_NOTE.convertRate) + '</th><th style="width:10%">' + dimTh('下载', DIM_TH_NOTE.dl) + '</th><th style="width:10%">' + dimTh('资源数', DIM_TH_NOTE.ct) + '</th><th style="width:10%">' + dimTh('评价', DIM_TH_NOTE.eval) + '</th></tr></thead><tbody>';
+    h += '<div class="box"><div class="box-hd"><span class="box-ttl">📋 学段学科明细 TOP15 <span style="font-size:11px;font-weight:400;color:var(--t3)">'+courseScopeNote+'</span></span></div><div class="tbl-wrap"><table class="data-table module-matrix-table"><thead><tr><th style="width:18%">📐 学段学科</th><th class="sortable sort-desc" style="width:12%" data-sort-key="pv" onclick="sortDimTable(this,\'pv\')">' + dimTh('PV', DIM_TH_NOTE.pv) + '</th><th class="sortable" style="width:12%" data-sort-key="uv" onclick="sortDimTable(this,\'uv\')">' + dimTh('UV', DIM_TH_NOTE.uv) + '</th><th class="sortable" style="width:11%" data-sort-key="use_users" onclick="sortDimTable(this,\'use_users\')">' + dimTh('使用人数','去重使用用户数') + '</th><th class="sortable" style="width:11%" data-sort-key="paid_users" onclick="sortDimTable(this,\'paid_users\')">' + dimTh('付费人数','去重付费用户数') + '</th><th class="sortable" style="width:12%" data-sort-key="use_rate" onclick="sortDimTable(this,\'use_rate\')">' + dimTh('使用率', DIM_TH_NOTE.useRate) + '</th><th class="sortable" style="width:14%" data-sort-key="convert_rate" onclick="sortDimTable(this,\'convert_rate\')">' + dimTh('付费转化', DIM_TH_NOTE.convertRate) + '</th><th class="sortable" style="width:10%" data-sort-key="dl" onclick="sortDimTable(this,\'dl\')">' + dimTh('下载', DIM_TH_NOTE.dl) + '</th><th class="sortable" style="width:10%" data-sort-key="ct" onclick="sortDimTable(this,\'ct\')">' + dimTh('资源数', DIM_TH_NOTE.ct) + '</th><th style="width:10%">' + dimTh('评价', DIM_TH_NOTE.eval) + '</th></tr></thead><tbody>';
+    cs.sort(function(a,b){ return (b.pv||0)-(a.pv||0); });
     cs.forEach(function(c){
       var m = courseMetrics[c.name];
       var evalTag = '';
@@ -5797,14 +5843,14 @@ function buildDimContent(tab, data){
       var convertClass = m.convertRate !== null && m.convertRate >= 5 ? 'rate-high' : (m.convertRate !== null && m.convertRate >= 3 ? 'rate-mid' : 'rate-low');
 
       h += '<tr><td class="name">📐 学段学科 '+esc(c.name)+'</td>';
-      h += '<td>'+sv(m.pv,1)+'</td>';
-      h += '<td>'+(m.uvMissing ? '<span style="color:var(--t3);font-size:12px" title="'+esc(buildDimMissingTitle(m.label, m.uv, m.useUsers, m.paidUsers, 'uv'))+'">--</span>' : sv(m.uv,1))+'</td>';
-      h += '<td>'+((m.useUsers === null || m.useUsersMissing) ? '<span style="color:var(--t3);font-size:12px">--</span>' : sv(m.useUsers,1))+'</td>';
-      h += '<td>'+((m.paidUsers === null || m.paidUsersMissing) ? '<span style="color:var(--t3);font-size:12px">--</span>' : sv(m.paidUsers,1))+'</td>';
-      h += '<td class="'+useRateClass+'">'+(m.useRate !== null ? fmtUseRate(m.useRate) : '<span style="color:var(--t3);font-size:12px" title="'+esc(buildDimMissingTitle(m.label, m.uv, m.useUsers, m.paidUsers, 'use_rate'))+'">--</span>')+'</td>';
-      h += '<td class="'+convertClass+'">'+(m.convertRate !== null ? fmtUseRate(m.convertRate) : '<span style="color:var(--t3);font-size:12px" title="'+esc(buildDimMissingTitle(m.label, m.uv, m.useUsers, m.paidUsers, 'convert_rate'))+'">--</span>')+'</td>';
-      h += '<td>'+sv(m.dl)+'</td>';
-      h += '<td>'+fmt(m.ct)+'</td>';
+      h += dimSortTd(m.pv, sv(m.pv,1));
+      h += dimSortTd(m.uvMissing ? null : m.uv, m.uvMissing ? '<span style="color:var(--t3);font-size:12px" title="'+esc(buildDimMissingTitle(m.label, m.uv, m.useUsers, m.paidUsers, 'uv'))+'">--</span>' : sv(m.uv,1));
+      h += dimSortTd((m.useUsers === null || m.useUsersMissing) ? null : m.useUsers, (m.useUsers === null || m.useUsersMissing) ? '<span style="color:var(--t3);font-size:12px">--</span>' : sv(m.useUsers,1));
+      h += dimSortTd((m.paidUsers === null || m.paidUsersMissing) ? null : m.paidUsers, (m.paidUsers === null || m.paidUsersMissing) ? '<span style="color:var(--t3);font-size:12px">--</span>' : sv(m.paidUsers,1));
+      h += dimSortTd(m.useRate, m.useRate !== null ? '<span class="'+useRateClass+'">'+fmtUseRate(m.useRate)+'</span>' : '<span style="color:var(--t3);font-size:12px" title="'+esc(buildDimMissingTitle(m.label, m.uv, m.useUsers, m.paidUsers, 'use_rate'))+'">--</span>');
+      h += dimSortTd(m.convertRate, m.convertRate !== null ? '<span class="'+convertClass+'">'+fmtUseRate(m.convertRate)+'</span>' : '<span style="color:var(--t3);font-size:12px" title="'+esc(buildDimMissingTitle(m.label, m.uv, m.useUsers, m.paidUsers, 'convert_rate'))+'">--</span>');
+      h += dimSortTd(m.dl, sv(m.dl));
+      h += dimSortTd(m.ct, fmt(m.ct));
       h += '<td>'+evalTag+'</td></tr>';
     });
     h += '</tbody></table></div></div>';
@@ -5816,8 +5862,8 @@ function buildDimContent(tab, data){
     else if(_gCourse&&activeStage) gradeScopeTxt='（当前为 '+activeStage+_gCourse+'×年级 交叉）';
     else gradeScopeTxt='（未选学科：整体年级使用大盘年级聚合口径）';
     h += buildDimMetricCharts('grade','📅 年级');
-    h += '<div class="box"><div class="box-hd"><span class="box-ttl">📋 年级明细 TOP15 <span style="font-size:11px;font-weight:400;color:var(--t3)">'+gradeScopeTxt+'</span></span></div><div class="tbl-wrap"><table class="data-table module-matrix-table"><thead><tr><th style="width:14%">📅 年级</th><th style="width:11%">PV</th><th style="width:11%">UV</th><th style="width:12%">使用用户</th><th style="width:12%">付费转化人数</th><th style="width:12%">使用率</th><th style="width:12%">付费转化率</th><th style="width:8%">下载</th><th style="width:8%">资源数</th></tr></thead><tbody>';
-    gr.forEach(function(m){ h+='<tr><td class="name">📅 '+esc(m.name)+'</td><td>'+sv(m.pv,1)+'</td><td>'+(m.uvMissing?'--':sv(m.uv,1))+'</td><td>'+(m.useUsersMissing?'--':sv(m.use_users,1))+'</td><td>'+(m.paidUsersMissing?'--':sv(m.paid_users,1))+'</td><td>'+(m.useRate===null?'--':fmtUseRate(m.useRate))+'</td><td>'+(m.convertRate===null?'--':fmtUseRate(m.convertRate))+'</td><td>'+sv(m.dl)+'</td><td>'+fmt(m.rc)+'</td></tr>'; });
+    h += '<div class="box"><div class="box-hd"><span class="box-ttl">📋 年级明细 TOP15 <span style="font-size:11px;font-weight:400;color:var(--t3)">'+gradeScopeTxt+'</span></span></div><div class="tbl-wrap"><table class="data-table module-matrix-table"><thead><tr><th style="width:14%">📅 年级</th><th class="sortable sort-desc" style="width:11%" data-sort-key="pv" onclick="sortDimTable(this,\'pv\')">PV</th><th class="sortable" style="width:11%" data-sort-key="uv" onclick="sortDimTable(this,\'uv\')">UV</th><th class="sortable" style="width:12%" data-sort-key="use_users" onclick="sortDimTable(this,\'use_users\')">使用用户</th><th class="sortable" style="width:12%" data-sort-key="paid_users" onclick="sortDimTable(this,\'paid_users\')">付费转化人数</th><th class="sortable" style="width:12%" data-sort-key="use_rate" onclick="sortDimTable(this,\'use_rate\')">使用率</th><th class="sortable" style="width:12%" data-sort-key="convert_rate" onclick="sortDimTable(this,\'convert_rate\')">付费转化率</th><th class="sortable" style="width:8%" data-sort-key="dl" onclick="sortDimTable(this,\'dl\')">下载</th><th class="sortable" style="width:8%" data-sort-key="ct" onclick="sortDimTable(this,\'ct\')">资源数</th></tr></thead><tbody>';
+    gr.forEach(function(m){ h+='<tr><td class="name">📅 '+esc(m.name)+'</td>'+dimSortTd(m.pv,sv(m.pv,1))+dimSortTd(m.uvMissing?null:m.uv,m.uvMissing?'--':sv(m.uv,1))+dimSortTd(m.useUsersMissing?null:m.use_users,m.useUsersMissing?'--':sv(m.use_users,1))+dimSortTd(m.paidUsersMissing?null:m.paid_users,m.paidUsersMissing?'--':sv(m.paid_users,1))+dimSortTd(m.useRate,m.useRate===null?'--':fmtUseRate(m.useRate))+dimSortTd(m.convertRate,m.convertRate===null?'--':fmtUseRate(m.convertRate))+dimSortTd(m.dl,sv(m.dl))+dimSortTd(m.rc,fmt(m.rc))+'</tr>'; });
     h += '</tbody></table></div></div>\n';
   } else if(tab==='version'){
     // Table and charts consume the same canonical version rows.
@@ -5835,23 +5881,24 @@ function buildDimContent(tab, data){
       verScopeTxt = '（未选学科：整体版本无权威去重聚合，UV/转化率显示"数据不足"）';
     }
     h += buildDimMetricCharts('version', '📖 版本');
-    h += '<div class="box"><div class="box-hd"><span class="box-ttl">📋 版本明细 TOP15 <span style="font-size:11px;font-weight:400;color:var(--t3)">'+verScopeTxt+'</span></span></div><div class="tbl-wrap"><table class="data-table module-matrix-table"><thead><tr><th style="width:14%">📖 版本</th><th style="width:11%">' + dimTh('PV', DIM_TH_NOTE.pv) + '</th><th style="width:11%">' + dimTh('UV', DIM_TH_NOTE.uv) + '</th><th style="width:12%">' + dimTh('使用用户','去重使用用户数') + '</th><th style="width:12%">' + dimTh('付费转化人数','去重付费转化人数') + '</th><th style="width:12%">' + dimTh('使用率', DIM_TH_NOTE.useRate) + '</th><th style="width:12%">' + dimTh('付费转化率', DIM_TH_NOTE.convertRate) + '</th><th style="width:8%">' + dimTh('下载', DIM_TH_NOTE.dl) + '</th><th style="width:8%">' + dimTh('资源数', DIM_TH_NOTE.ct) + '</th></tr></thead><tbody>';
+    h += '<div class="box"><div class="box-hd"><span class="box-ttl">📋 版本明细 TOP15 <span style="font-size:11px;font-weight:400;color:var(--t3)">'+verScopeTxt+'</span></span></div><div class="tbl-wrap"><table class="data-table module-matrix-table"><thead><tr><th style="width:14%">📖 版本</th><th class="sortable sort-desc" style="width:11%" data-sort-key="pv" onclick="sortDimTable(this,\'pv\')">' + dimTh('PV', DIM_TH_NOTE.pv) + '</th><th class="sortable" style="width:11%" data-sort-key="uv" onclick="sortDimTable(this,\'uv\')">' + dimTh('UV', DIM_TH_NOTE.uv) + '</th><th class="sortable" style="width:12%" data-sort-key="use_users" onclick="sortDimTable(this,\'use_users\')">' + dimTh('使用用户','去重使用用户数') + '</th><th class="sortable" style="width:12%" data-sort-key="paid_users" onclick="sortDimTable(this,\'paid_users\')">' + dimTh('付费转化人数','去重付费转化人数') + '</th><th class="sortable" style="width:12%" data-sort-key="use_rate" onclick="sortDimTable(this,\'use_rate\')">' + dimTh('使用率', DIM_TH_NOTE.useRate) + '</th><th class="sortable" style="width:12%" data-sort-key="convert_rate" onclick="sortDimTable(this,\'convert_rate\')">' + dimTh('付费转化率', DIM_TH_NOTE.convertRate) + '</th><th class="sortable" style="width:8%" data-sort-key="dl" onclick="sortDimTable(this,\'dl\')">' + dimTh('下载', DIM_TH_NOTE.dl) + '</th><th class="sortable" style="width:8%" data-sort-key="ct" onclick="sortDimTable(this,\'ct\')">' + dimTh('资源数', DIM_TH_NOTE.ct) + '</th></tr></thead><tbody>';
     ver.forEach(function(v){
       var m = verMetrics[v.name];
       var useRateClass = m.useRate !== null && m.useRate >= 40 ? 'rate-high' : (m.useRate !== null && m.useRate >= 20 ? 'rate-mid' : 'rate-low');
       var convertClass = m.convertRate !== null && m.convertRate >= 5 ? 'rate-high' : (m.convertRate !== null && m.convertRate >= 3 ? 'rate-mid' : 'rate-low');
       h += '<tr><td class="name">📖 '+esc(v.name)+'</td>';
-      h += '<td>'+sv(m.pv,1)+'</td>';
-      h += '<td>'+(m.uvMissing ? '<span style="color:var(--t3);font-size:12px">--</span>' : sv(m.uv,1))+'</td>';
-      h += '<td>'+(m.useUsersMissing ? '<span style="color:var(--t3);font-size:12px">--</span>' : sv(m.use_users,1))+'</td>';
-      h += '<td>'+(m.paidUsersMissing ? '<span style="color:var(--t3);font-size:12px">--</span>' : sv(m.paid_users,1))+'</td>';
-      h += '<td class="'+useRateClass+'">'+(m.useRate === null ? '<span style="color:var(--t3);font-size:12px">--</span>' : fmtUseRate(m.useRate))+'</td>';
-      h += '<td class="'+convertClass+'">'+(m.convertRate === null ? '<span style="color:var(--t3);font-size:12px">--</span>' : fmtUseRate(m.convertRate))+'</td>';
-      h += '<td>'+sv(m.dl)+'</td><td>'+fmt(m.rc)+'</td></tr>';
+      h += dimSortTd(m.pv, sv(m.pv,1));
+      h += dimSortTd(m.uvMissing ? null : m.uv, m.uvMissing ? '<span style="color:var(--t3);font-size:12px">--</span>' : sv(m.uv,1));
+      h += dimSortTd(m.useUsersMissing ? null : m.use_users, m.useUsersMissing ? '<span style="color:var(--t3);font-size:12px">--</span>' : sv(m.use_users,1));
+      h += dimSortTd(m.paidUsersMissing ? null : m.paid_users, m.paidUsersMissing ? '<span style="color:var(--t3);font-size:12px">--</span>' : sv(m.paid_users,1));
+      h += dimSortTd(m.useRate, m.useRate === null ? '<span style="color:var(--t3);font-size:12px">--</span>' : '<span class="'+useRateClass+'">'+fmtUseRate(m.useRate)+'</span>');
+      h += dimSortTd(m.convertRate, m.convertRate === null ? '<span style="color:var(--t3);font-size:12px">--</span>' : '<span class="'+convertClass+'">'+fmtUseRate(m.convertRate)+'</span>');
+      h += dimSortTd(m.dl, sv(m.dl))+dimSortTd(m.rc, fmt(m.rc))+'</tr>';
     });
     h += '</tbody></table></div></div>';
   } else if(tab==='module'){
     var mod = getModuleMetricRows(data);
+    mod.sort(function(a,b){ return (b.pv||0)-(a.pv||0); });
     var moduleChartDefs = [
       {key:'pv', label:'PV', note:DIM_TH_NOTE.pv, rate:false},
       {key:'uv', label:'UV', note:DIM_TH_NOTE.uv, rate:false},
@@ -5866,22 +5913,25 @@ function buildDimContent(tab, data){
       if(i === 1 || i === 3) h += '</div><div class="row r2">';
     });
     h += '</div>';
-    h += '<div class="box"><div class="box-hd"><span class="box-ttl">📋 资源分类六项核心指标</span><span class="box-sub">去重指标无精确模块聚合时显示“数据不足”</span></div><div class="tbl-wrap"><table class="data-table module-matrix-table"><thead><tr><th style="width:14%">资源分类</th><th style="width:10%">'+dimTh('PV',DIM_TH_NOTE.pv)+'</th><th style="width:10%">'+dimTh('UV',DIM_TH_NOTE.uv)+'</th><th style="width:12%">'+dimTh('使用人数','去重使用用户数')+'</th><th style="width:12%">'+dimTh('付费人数','去重付费用户数')+'</th><th style="width:12%">'+dimTh('使用率',DIM_TH_NOTE.useRate)+'</th><th style="width:12%">'+dimTh('付费转化率',DIM_TH_NOTE.convertRate)+'</th><th style="width:9%">'+dimTh('下载',DIM_TH_NOTE.dl)+'</th><th style="width:9%">'+dimTh('资源数',DIM_TH_NOTE.ct)+'</th></tr></thead><tbody>';
+    h += '<div class="box"><div class="box-hd"><span class="box-ttl">📋 资源分类六项核心指标</span><span class="box-sub">去重指标无精确模块聚合时显示“数据不足”</span></div><div class="tbl-wrap"><table class="data-table module-matrix-table"><thead><tr><th style="width:14%">资源分类</th><th class="sortable sort-desc" style="width:10%" data-sort-key="pv" onclick="sortDimTable(this,\'pv\')">'+dimTh('PV',DIM_TH_NOTE.pv)+'</th><th class="sortable" style="width:10%" data-sort-key="uv" onclick="sortDimTable(this,\'uv\')">'+dimTh('UV',DIM_TH_NOTE.uv)+'</th><th class="sortable" style="width:12%" data-sort-key="use_users" onclick="sortDimTable(this,\'use_users\')">'+dimTh('使用人数','去重使用用户数')+'</th><th class="sortable" style="width:12%" data-sort-key="paid_users" onclick="sortDimTable(this,\'paid_users\')">'+dimTh('付费人数','去重付费用户数')+'</th><th class="sortable" style="width:12%" data-sort-key="use_rate" onclick="sortDimTable(this,\'use_rate\')">'+dimTh('使用率',DIM_TH_NOTE.useRate)+'</th><th class="sortable" style="width:12%" data-sort-key="convert_rate" onclick="sortDimTable(this,\'convert_rate\')">'+dimTh('付费转化率',DIM_TH_NOTE.convertRate)+'</th><th class="sortable" style="width:9%" data-sort-key="dl" onclick="sortDimTable(this,\'dl\')">'+dimTh('下载',DIM_TH_NOTE.dl)+'</th><th class="sortable" style="width:9%" data-sort-key="ct" onclick="sortDimTable(this,\'ct\')">'+dimTh('资源数',DIM_TH_NOTE.ct)+'</th></tr></thead><tbody>';
     mod.forEach(function(m){
       var useRateClass = m.use_rate !== null && m.use_rate >= 40 ? 'rate-high' : (m.use_rate !== null && m.use_rate >= 20 ? 'rate-mid' : 'rate-low');
       var convertClass = m.convert_rate !== null && m.convert_rate >= 5 ? 'rate-high' : (m.convert_rate !== null && m.convert_rate >= 3 ? 'rate-mid' : 'rate-low');
       var missing = function(v, title){ return v === null ? '<span style="color:var(--t3);font-size:12px" title="'+esc(title)+'">数据不足</span>' : sv(v,1); };
       h += '<tr><td class="name">'+esc(m.name)+'</td>';
-      h += '<td>'+sv(m.pv,1)+'</td><td>'+missing(m.uv,'UV需精确模块聚合')+'</td>';
-      h += '<td>'+missing(m.use_users,'使用人数需精确模块聚合')+'</td><td>'+missing(m.paid_users,'付费人数需精确模块聚合')+'</td>';
-      h += '<td class="'+useRateClass+'">'+(m.use_rate === null ? '<span style="color:var(--t3)">数据不足</span>' : fmtUseRate(m.use_rate))+'</td>';
-      h += '<td class="'+convertClass+'">'+(m.convert_rate === null ? '<span style="color:var(--t3)">数据不足</span>' : fmtUseRate(m.convert_rate))+'</td>';
-      h += '<td>'+sv(m.dl,1)+'</td><td>'+fmt(m.ct)+'</td></tr>';
+      h += dimSortTd(m.missing ? null : m.pv, m.missing?'<span style="color:var(--t3)">数据不足</span>':sv(m.pv,1));
+      h += dimSortTd(m.uv, missing(m.uv,'UV需精确模块聚合'));
+      h += dimSortTd(m.use_users, missing(m.use_users,'使用人数需精确模块聚合'));
+      h += dimSortTd(m.paid_users, missing(m.paid_users,'付费人数需精确模块聚合'));
+      h += dimSortTd(m.use_rate, m.use_rate === null ? '<span style="color:var(--t3)">数据不足</span>' : '<span class="'+useRateClass+'">'+fmtUseRate(m.use_rate)+'</span>');
+      h += dimSortTd(m.convert_rate, m.convert_rate === null ? '<span style="color:var(--t3)">数据不足</span>' : '<span class="'+convertClass+'">'+fmtUseRate(m.convert_rate)+'</span>');
+      h += dimSortTd(m.missing ? null : m.dl, m.missing?'<span style="color:var(--t3)">数据不足</span>':sv(m.dl,1))+dimSortTd(m.missing ? null : m.ct, m.missing?'<span style="color:var(--t3)">数据不足</span>':fmt(m.ct))+'</tr>';
     });
     h += '</tbody></table></div></div>';
   } else if(tab==='category'){
     // 业务板块统一使用新增“学练测”聚合，不再从旧模块明细推导板块。
     var mod = getPracticeMetricRows(data);
+    mod.sort(function(a,b){ return (b.pv||0)-(a.pv||0); });
     var moduleChartDefs = [
       {key:'pv', label:'PV', note:DIM_TH_NOTE.pv, rate:false},
       {key:'uv', label:'UV', note:DIM_TH_NOTE.uv, rate:false},
@@ -5895,10 +5945,10 @@ function buildDimContent(tab, data){
       h += '<div class="box"><div class="box-hd"><span class="box-ttl">📦 '+cd.label+'排行</span></div><div class="chart" id="ch-dim-cat-'+cd.key+'"></div></div>';
       if(i === 1 || i === 3) h += '</div><div class="row r2">';
     });
-    h += '</div><div class="box"><div class="box-hd"><span class="box-ttl">📋 学练测三项核心指标</span></div><div class="tbl-wrap"><table class="data-table module-matrix-table"><thead><tr><th>板块</th><th>PV</th><th>UV</th><th>使用人数</th><th>付费人数</th><th>使用率</th><th>付费转化率</th><th>下载</th><th>资源数</th></tr></thead><tbody>';
+    h += '</div><div class="box"><div class="box-hd"><span class="box-ttl">📋 学练测三项核心指标</span></div><div class="tbl-wrap"><table class="data-table module-matrix-table"><thead><tr><th>板块</th><th class="sortable sort-desc" data-sort-key="pv" onclick="sortDimTable(this,\'pv\')">PV</th><th class="sortable" data-sort-key="uv" onclick="sortDimTable(this,\'uv\')">UV</th><th class="sortable" data-sort-key="use_users" onclick="sortDimTable(this,\'use_users\')">使用人数</th><th class="sortable" data-sort-key="paid_users" onclick="sortDimTable(this,\'paid_users\')">付费人数</th><th class="sortable" data-sort-key="use_rate" onclick="sortDimTable(this,\'use_rate\')">使用率</th><th class="sortable" data-sort-key="convert_rate" onclick="sortDimTable(this,\'convert_rate\')">付费转化率</th><th class="sortable" data-sort-key="dl" onclick="sortDimTable(this,\'dl\')">下载</th><th class="sortable" data-sort-key="ct" onclick="sortDimTable(this,\'ct\')">资源数</th></tr></thead><tbody>';
     mod.forEach(function(m){
-      var missing=function(v){return v==null?'<span style="color:var(--t3)">数据不足</span>':sv(v,1);};
-      h += '<tr><td class="name">'+esc(m.name)+'</td><td>'+sv(m.pv,1)+'</td><td>'+missing(m.uv)+'</td><td>'+missing(m.use_users)+'</td><td>'+missing(m.paid_users)+'</td><td>'+missing(m.use_rate)+'</td><td>'+missing(m.convert_rate)+'</td><td>'+sv(m.dl,1)+'</td><td>'+fmt(m.ct)+'</td></tr>';
+      var miss=function(v){return v==null?'<span style="color:var(--t3)">数据不足</span>':sv(v,1);};
+      h += '<tr><td class="name">'+esc(m.name)+'</td>'+dimSortTd(m.pv,sv(m.pv,1))+dimSortTd(m.uv,miss(m.uv))+dimSortTd(m.use_users,miss(m.use_users))+dimSortTd(m.paid_users,miss(m.paid_users))+dimSortTd(m.use_rate,miss(m.use_rate))+dimSortTd(m.convert_rate,miss(m.convert_rate))+dimSortTd(m.dl,sv(m.dl,1))+dimSortTd(m.ct,fmt(m.ct))+'</tr>';
     });
     h += '</tbody></table></div></div>';
   }
