@@ -3652,6 +3652,13 @@ function kpUvForCategory(cat, phase){
   if (uv === undefined || uv === null || isNaN(uv) || uv === 0) return null;
   return uv;
 }
+function kpConvertRateForCategory(cat, phase){
+  var kp = getPracticeKp(cat, phase);
+  if (!kp) return null;
+  var r = parseFloat(kp.convert_rate);
+  if (!isNaN(r)) return r <= 1.5 ? r * 100 : r;
+  return safeConvertRateFromUv(kp.paid_users, kp.uv);
+}
 
 function buildCategorySceneMatrix(data){
   // 第3板块：学/练/测 各阶段对比矩阵。
@@ -3667,6 +3674,7 @@ function buildCategorySceneMatrix(data){
   // 指标配置：所有数值直接从 kp 取，不再依赖资源明细累加。
   var metricConfig = {
     'use_rate': {label:'使用率', unit:'%', fmt:fmtPct, isPct:true},
+    'convert_rate': {label:'付费转化率', unit:'%', fmt:fmtPct, isPct:true},
     'pv': {label:'PV', unit:'', fmt:function(v){ return sv(v,0); }, isPct:false},
     'uv': {label:'UV', unit:'', fmt:function(v){ return v===null?'<span style="color:var(--t3);font-size:12px" title="UV需按用户ID去重，板块整体暂无聚合数据">数据不足</span>':sv(v,0); }, isPct:false},
     'download_count': {label:'下载次数', unit:'', fmt:function(v){ return sv(v,0); }, isPct:false},
@@ -3680,6 +3688,7 @@ function buildCategorySceneMatrix(data){
   // 从 kp 读取单个板块在指定阶段、指定指标的值
   function getCategoryValue(cat, phase, metric){
     if(metric === 'use_rate') return kpRateForCategory(cat, phase);
+    if(metric === 'convert_rate') return kpConvertRateForCategory(cat, phase);
     if(metric === 'download_users') return null;
     var map = {'pv':'pv','uv':'uv','use_users':'use_users','paid_users':'paid_users','download_count':'dl','resource_count':'rc'};
     return getKpMetric('category', cat, map[metric], phase);
@@ -3696,6 +3705,7 @@ function buildCategorySceneMatrix(data){
   h += '<span style="font-size:13px;font-weight:600;color:var(--t2)">📊 显示指标：</span>';
   var metricBtns = [
     {key:'use_rate', label:'使用率'},
+    {key:'convert_rate', label:'付费转化率'},
     {key:'pv', label:'PV'},
     {key:'uv', label:'UV'},
     {key:'download_count', label:'下载次数'},
@@ -3848,7 +3858,7 @@ function switchCategorySceneMetric(metric){
 var TIME_COMPARE_CONFIG = {
   comparePhases: [],           // 对比阶段名称数组（如 '25-26秋季期中'），为空则不对比
   rowDim: 'scene2',           // 纵坐标维度: scene2=日期-场景(默认), category=板块
-  showMetrics: ['pv','uv','download_count','download_users','use_users','paid_users','use_rate','resource_count'],
+  showMetrics: ['pv','uv','download_count','download_users','use_users','paid_users','use_rate','convert_rate','resource_count'],
   showBarChart: false,
   showLineChart: false,
   chartMetrics: [],
@@ -4040,6 +4050,7 @@ function buildTimeCompareTable(data){
     'use_users': {label:'使用用户', fmt:function(v){ return v===null ? '<span style="color:var(--t3)">数据不足</span>' : sv(v,0); }},
     'paid_users': {label:'付费转化用户', fmt:function(v){ return v===null ? '<span style="color:var(--t3)">数据不足</span>' : sv(v,0); }},
     'use_rate': {label:'使用率', fmt:fmtPct},
+    'convert_rate': {label:'付费转化率', fmt:fmtPct},
     'resource_count': {label:'资源量', fmt:function(v){ return fmt(v); }}
   };
 
@@ -4092,7 +4103,7 @@ function buildTimeCompareTable(data){
       var categoryUse = categoryKp ? categoryKp.use_users : null;
       var categoryPaid = categoryKp ? categoryKp.paid_users : null;
       var categoryDownloadUsers = categoryKp ? categoryKp.download_users : null;
-      return {pv:categoryKp && categoryKp.pv != null ? categoryKp.pv : bd.pv, uv:uv, download_count:categoryKp && categoryKp.dl != null ? categoryKp.dl : bd.dl, download_users:categoryDownloadUsers != null ? categoryDownloadUsers : null, use_users:categoryUse, paid_users:categoryPaid, use_rate:rate, resource_count:categoryKp && categoryKp.rc != null ? categoryKp.rc : bd.ct, scopeCover:scopeCover};
+      return {pv:categoryKp && categoryKp.pv != null ? categoryKp.pv : bd.pv, uv:uv, download_count:categoryKp && categoryKp.dl != null ? categoryKp.dl : bd.dl, download_users:categoryDownloadUsers != null ? categoryDownloadUsers : null, use_users:categoryUse, paid_users:categoryPaid, use_rate:rate, convert_rate:safeConvertRateFromUv(categoryPaid, uv), resource_count:categoryKp && categoryKp.rc != null ? categoryKp.rc : bd.ct, scopeCover:scopeCover};
     } else if(rowDim === 'scene2' && kpPhase && isSceneCoveringWholePhase(kpPhase, rowDim, rowVal)){
       // 覆盖全阶段的场景行：现期填充已统一为 kp 总览口径，uv/使用率直接读 bd（去重真值），无需重查
       if(bd.uv > 0){
@@ -4102,13 +4113,14 @@ function buildTimeCompareTable(data){
       }
     }
     // scene2 无 kp 聚合且未覆盖全阶段时，rate/uv 保持 null
-    return {pv:bd.pv, uv:uv, download_count:bd.dl, download_users:null, use_users:scopeCover ? bd.useUsers : null, paid_users:scopeCover ? bd.paidUsers : null, use_rate:rate, resource_count:bd.ct, scopeCover:scopeCover};
+    return {pv:bd.pv, uv:uv, download_count:bd.dl, download_users:null, use_users:scopeCover ? bd.useUsers : null, paid_users:scopeCover ? bd.paidUsers : null, use_rate:rate, convert_rate:scopeCover ? safeConvertRateFromUv(bd.paidUsers, bd.uv) : null, resource_count:bd.ct, scopeCover:scopeCover};
   }
   function fmtOverall(om){
     // om 来自 getPhaseKpiOverall：kp 命中(source=kp)才有去重值，否则 useUsers/uv=0
     var ok = om && om.source === 'kp' && !om.dedupMissing;
     var rate = ok ? safeUseRate(om.useUsers || 0, om.uv || 0) : null;
-    return {pv:om.pv, uv: ok ? (om.uv || 0) : null, download_count:om.dl, download_users:ok ? (om.downloadUsers == null ? null : om.downloadUsers) : null, use_users:ok ? (om.useUsers || 0) : null, paid_users:ok ? (om.paidUsers == null ? null : om.paidUsers) : null, use_rate:ok ? safeUseRate(om.useUsers || 0, om.uv || 0) : null, resource_count:om.ct};
+    var convertRate = ok ? safeConvertRateFromUv(om.paidUsers == null ? null : om.paidUsers, om.uv || 0) : null;
+    return {pv:om.pv, uv: ok ? (om.uv || 0) : null, download_count:om.dl, download_users:ok ? (om.downloadUsers == null ? null : om.downloadUsers) : null, use_users:ok ? (om.useUsers || 0) : null, paid_users:ok ? (om.paidUsers == null ? null : om.paidUsers) : null, use_rate:rate, convert_rate:convertRate, resource_count:om.ct};
   }
   var matrix = {};
   rowValues.forEach(function(rv){
@@ -4198,6 +4210,17 @@ function buildTimeCompareTable(data){
           });
         }
       }
+    });
+  }
+
+  // 日期-场景维度下，收集每个对比阶段对应的原始 scene2 名称，用于表格第一列分别展示基期/现期场景
+  var compareScene2Names = {};
+  if(rowDim === 'scene2'){
+    selectedComparePhases.forEach(function(cp, ci){
+      compareScene2Names[ci] = {};
+      filterSceneCompareData(ALL_RES, cp).forEach(function(r){
+        if(r.scene2) compareScene2Names[ci][normalizeScene2(r.scene2)] = r.scene2;
+      });
     });
   }
 
@@ -4304,64 +4327,83 @@ function buildTimeCompareTable(data){
     });
     h += '</tbody></table>';
   } else {
-    // 有对比：现期列 + 各基期列 + 变化列
-    h += '<div class="tbl-wrap">';
-    h += '<table class="data-table yoy-table">';
-    h += '<thead><tr>';
-    h += '<th rowspan="2" style="text-align:center;vertical-align:middle">'+esc(rowLabels[rowDim])+'</th>';
-    h += '<th colspan="'+TIME_COMPARE_CONFIG.showMetrics.length+'" style="text-align:center;background:#DBEAFE;color:var(--blue);font-size:13px">📊 现期<br><span style="font-weight:400;font-size:10px">'+esc(baseLabel)+'</span></th>';
+    // 有对比：改为纵向表格，每个基期一张表，同一维度下基期行在上、现期行在下，变化列跨两行显示
     selectedComparePhases.forEach(function(cp, ci){
-      h += '<th colspan="'+(TIME_COMPARE_CONFIG.showMetrics.length+1)+'" style="text-align:center;background:#D1FAE5;color:#059669;font-size:13px">📊 基期<br><span style="font-weight:400;font-size:10px">'+esc(cp)+'</span></th>';
-    });
-    h += '</tr><tr>';
-    TIME_COMPARE_CONFIG.showMetrics.forEach(function(mk){
-      h += '<th style="width:90px;text-align:center">'+metricConfig[mk].label+'</th>';
-    });
-    selectedComparePhases.forEach(function(cp, ci){
+      h += '<div class="tbl-wrap" style="margin-bottom:16px;">';
+      h += '<div style="font-size:13px;font-weight:600;color:var(--t2);margin-bottom:8px">📊 ' + esc(rowLabels[rowDim]) + '对比：现期 <span style="color:var(--blue)">' + esc(baseLabel) + '</span> vs 基期 <span style="color:#059669">' + esc(cp) + '</span></div>';
+      h += '<table class="data-table yoy-table">';
+      h += '<thead><tr>';
+      h += '<th style="text-align:center;width:100px">' + esc(rowLabels[rowDim]) + '</th>';
+      h += '<th style="text-align:center;width:70px">阶段</th>';
       TIME_COMPARE_CONFIG.showMetrics.forEach(function(mk){
-        h += '<th style="width:90px;text-align:center;background:var(--s)">'+metricConfig[mk].label+'</th>';
+        h += '<th style="text-align:center">' + metricConfig[mk].label + '</th>';
       });
-      h += '<th style="width:70px;text-align:center;background:#FEF3C7;color:#D97706">变化</th>';
-    });
-    h += '</tr></thead><tbody>';
+      h += '<th style="text-align:center;background:#FEF3C7;color:#D97706;width:110px">使用率变化情况</th>';
+      h += '<th style="text-align:center;background:#FEF3C7;color:#D97706;width:110px">付费转化变化情况</th>';
+      h += '</tr></thead><tbody>';
 
-    rowValues.forEach(function(rv){
-      var bd = matrix[rv].base;
-      var bm = fmtRow(bd, rv);   // 使用率按维度查 kp，无则 null
-      var rowColor = mapCategoryColor(rv);
-      h += '<tr>';
-      h += '<td style="font-weight:600">';
-      if(rowColor){ h += '<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:'+rowColor+';margin-right:6px;"></span>'; }
-      h += esc(rv)+'</td>';
-
-      // 现期列
-      TIME_COMPARE_CONFIG.showMetrics.forEach(function(mk){
-        var v = bm[mk];
-        h += '<td style="text-align:center;padding:8px">'+(v===null?'<span style="color:var(--t3)">--</span>':'<span style="font-weight:600;font-size:13px">'+metricConfig[mk].fmt(v)+'</span>')+'</td>';
-      });
-
-      // 各基期列
-      selectedComparePhases.forEach(function(cp, ci){
+      rowValues.forEach(function(rv){
+        var bd = matrix[rv].base;
+        var bm = fmtRow(bd, rv);   // 使用率按维度查 kp，无则 null
         var cd = matrix[rv]['c'+ci];
         var cm = fmtRow(cd, rv, cp);   // 使用率按维度查 kp，无则 null
+        var rowColor = mapCategoryColor(rv);
+        var rowLabel = (rowColor ? '<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:'+rowColor+';margin-right:6px;"></span>' : '') + esc(rv) + (bm.scopeCover ? '<div style="font-size:10px;font-weight:400;color:var(--t3)">覆盖全阶段=总览口径</div>' : '');
+
+        // 使用率变化（现期 - 基期），保留两位小数
+        var useDelta = null, useDeltaStr = '--', useDeltaColor = 'var(--t3)', useIcon = '−';
+        if(bm.use_rate !== null && cm.use_rate !== null){
+          useDelta = bm.use_rate - cm.use_rate;
+          useDeltaColor = useDelta > 0 ? 'var(--g)' : (useDelta < 0 ? 'var(--r)' : 'var(--t3)');
+          useIcon = useDelta > 0 ? '▲' : (useDelta < 0 ? '▼' : '−');
+          useDeltaStr = useIcon + ' ' + Math.abs(useDelta).toFixed(2) + 'pp';
+        }
+
+        // 付费转化率变化（现期 - 基期），保留两位小数
+        var convertDelta = null, convertDeltaStr = '--', convertDeltaColor = 'var(--t3)', convertIcon = '−';
+        if(bm.convert_rate !== null && cm.convert_rate !== null){
+          convertDelta = bm.convert_rate - cm.convert_rate;
+          convertDeltaColor = convertDelta > 0 ? 'var(--g)' : (convertDelta < 0 ? 'var(--r)' : 'var(--t3)');
+          convertIcon = convertDelta > 0 ? '▲' : (convertDelta < 0 ? '▼' : '−');
+          convertDeltaStr = convertIcon + ' ' + Math.abs(convertDelta).toFixed(2) + 'pp';
+        }
+
+        // 日期-场景维度下，第一列分别显示两个阶段的原始场景名；板块维度仍合并显示板块名
+        var isScene2Dim = rowDim === 'scene2';
+        var compareSceneName = isScene2Dim ? (compareScene2Names[ci] && compareScene2Names[ci][normalizeScene2(rv)] ? compareScene2Names[ci][normalizeScene2(rv)] : cp) : rv;
+        var compareRowLabel = (rowColor && !isScene2Dim ? '<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:'+rowColor+';margin-right:6px;"></span>' : '') + esc(compareSceneName) + (cm.scopeCover ? '<div style="font-size:10px;font-weight:400;color:var(--t3)">覆盖全阶段=总览口径</div>' : '');
+        var baseRowLabel = (rowColor && !isScene2Dim ? '<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:'+rowColor+';margin-right:6px;"></span>' : '') + esc(rv) + (bm.scopeCover ? '<div style="font-size:10px;font-weight:400;color:var(--t3)">覆盖全阶段=总览口径</div>' : '');
+
+        // 基期行（在上）
+        h += '<tr>';
+        if(isScene2Dim){
+          h += '<td style="font-weight:600;text-align:center">' + compareRowLabel + '</td>';
+        } else {
+          h += '<td rowspan="2" style="font-weight:600;text-align:center;vertical-align:middle">' + rowLabel + '</td>';
+        }
+        h += '<td style="font-weight:600;background:#D1FAE5;color:#059669;text-align:center">基期</td>';
         TIME_COMPARE_CONFIG.showMetrics.forEach(function(mk){
           var v = cm[mk];
-          h += '<td style="text-align:center;padding:8px;background:var(--s)">'+(v===null?'<span style="color:var(--t3)">--</span>':'<span style="font-weight:600;font-size:13px">'+metricConfig[mk].fmt(v)+'</span>')+'</td>';
+          h += '<td style="text-align:center;padding:8px;background:var(--s)">' + (v===null?'<span style="color:var(--t3)">--</span>':'<span style="font-weight:600;font-size:13px">'+metricConfig[mk].fmt(v)+'</span>') + '</td>';
         });
-        // 变化列（基于使用率）
-        var br = bm.use_rate;
-        var cr = cm.use_rate;
-        var hasMissing = br === null || cr === null;
-        var delta = hasMissing ? null : cr - br;
-        var deltaColor = hasMissing ? 'var(--t3)' : (delta > 0 ? 'var(--g)' : (delta < 0 ? 'var(--r)' : 'var(--t3)'));
-        h += '<td style="text-align:center;padding:8px;font-weight:600;color:'+deltaColor+'">';
-        if(hasMissing){ h += '--'; }
-        else { h += (delta>=0?'+':'')+delta+'pp'; }
-        h += '</td>';
+        h += '<td rowspan="2" style="text-align:center;padding:8px;background:#FEF3C7;color:'+useDeltaColor+';font-weight:600;vertical-align:middle">' + useDeltaStr + '</td>';
+        h += '<td rowspan="2" style="text-align:center;padding:8px;background:#FEF3C7;color:'+convertDeltaColor+';font-weight:600;vertical-align:middle">' + convertDeltaStr + '</td>';
+        h += '</tr>';
+
+        // 现期行（在下）
+        h += '<tr>';
+        if(isScene2Dim){
+          h += '<td style="font-weight:600;text-align:center">' + baseRowLabel + '</td>';
+        }
+        h += '<td style="font-weight:600;background:#DBEAFE;color:var(--blue);text-align:center">现期</td>';
+        TIME_COMPARE_CONFIG.showMetrics.forEach(function(mk){
+          var v = bm[mk];
+          h += '<td style="text-align:center;padding:8px">' + (v===null?'<span style="color:var(--t3)">--</span>':'<span style="font-weight:600;font-size:13px">'+metricConfig[mk].fmt(v)+'</span>') + '</td>';
+        });
+        h += '</tr>';
       });
-      h += '</tr>';
+      h += '</tbody></table></div>';
     });
-    h += '</tbody></table></div>';
   }
 
   // 图表区域：图表控制条 → 基期选择下拉 → 图表容器
@@ -4796,9 +4838,10 @@ function buildDimYoyContent(dim, data){
     'use_users': {label:'使用用户', fmt:function(v){ return v===null ? '<span style="color:var(--t3)">数据不足</span>' : sv(v,0); }},
     'paid_users': {label:'付费转化用户', fmt:function(v){ return v===null ? '<span style="color:var(--t3)">数据不足</span>' : sv(v,0); }},
     'use_rate': {label:'使用率', fmt:fmtPct},
+    'convert_rate': {label:'付费转化率', fmt:fmtPct},
     'resource_count': {label:'资源量', fmt:function(v){ return fmt(v); }}
   };
-  var showMetrics = ['pv','uv','use_users','paid_users','use_rate','download_count','resource_count'];
+  var showMetrics = ['pv','uv','use_users','paid_users','use_rate','convert_rate','download_count','resource_count'];
 
   // 按维度聚合（不过滤，保留全部维度用于表格）
   // ⚠️ 学科维度必须按 学段+学科 分组（初中化学≠高中化学），不能直接用 aggBy(course) 跨学段累加。
@@ -4868,14 +4911,14 @@ function buildDimYoyContent(dim, data){
   h += '<th colspan="'+showMetrics.length+'" style="text-align:center;background:#DBEAFE;color:var(--blue);font-size:13px">📊 现期<br><span style="font-weight:400;font-size:10px">'+esc(baseLabel)+'</span></th>';
   comparePhases.forEach(function(cp, i){
     h += '<th colspan="'+showMetrics.length+'" style="text-align:center;background:#D1FAE5;color:#059669;font-size:13px">📊 基期<br><span style="font-weight:400;font-size:10px">'+esc(cp)+'</span></th>';
-    h += '<th colspan="2" style="text-align:center;background:#FEF3C7;color:#D97706;font-size:13px">变化率('+esc(cp)+')</th>';
+    h += '<th colspan="2" style="text-align:center;background:#FEF3C7;color:#D97706;font-size:13px">变化情况('+esc(cp)+')</th>';
   });
   h += '</tr><tr>';
     showMetrics.forEach(function(mk){ h += '<th style="width:70px;text-align:center">' + metricConfig[mk].label + '</th>'; });
   comparePhases.forEach(function(cp, i){
     showMetrics.forEach(function(mk){ h += '<th style="width:70px;text-align:center;background:var(--s)">' + metricConfig[mk].label + '</th>'; });
-    h += '<th style="width:70px;text-align:center">使用率变化率</th>';
-    h += '<th style="width:70px;text-align:center">付费转化变化率</th>';
+    h += '<th style="width:70px;text-align:center">使用率变化情况</th>';
+    h += '<th style="width:70px;text-align:center">付费转化变化情况</th>';
   });
   h += '</tr></thead><tbody>';
 
@@ -4963,28 +5006,26 @@ function buildDimYoyContent(dim, data){
         h += '</td>';
       });
 
-      // 变化率（使用率 & 付费转化率）
+      // 变化情况（使用率 & 付费转化率）：现期 − 基期，以 pp（百分点）表示，保留两位小数
       var baseUseRate = baseMetrics.use_rate;
       var compareUseRate = compareMetrics.use_rate;
       var hasMissingUseRate = baseUseRate === null || compareUseRate === null;
-      var useDelta = hasMissingUseRate ? null : compareUseRate - baseUseRate;
-      var useDeltaPct = hasMissingUseRate ? null : (baseUseRate > 0 ? (useDelta / baseUseRate * 100) : (compareUseRate > 0 ? 100 : 0));
+      var useDelta = hasMissingUseRate ? null : baseUseRate - compareUseRate;
       var useColor = hasMissingUseRate ? 'var(--t3)' : (useDelta > 0 ? 'var(--g)' : (useDelta < 0 ? 'var(--r)' : 'var(--t3)'));
       var useIcon = hasMissingUseRate ? '−' : (useDelta > 0 ? '▲' : (useDelta < 0 ? '▼' : '−'));
 
       var baseConvertRate = baseMetrics.convert_rate;
       var compareConvertRate = compareMetrics.convert_rate;
       var hasMissingConvertRate = baseConvertRate === null || compareConvertRate === null;
-      var convertDelta = hasMissingConvertRate ? null : compareConvertRate - baseConvertRate;
-      var convertDeltaPct = hasMissingConvertRate ? null : (baseConvertRate > 0 ? (convertDelta / baseConvertRate * 100) : (compareConvertRate > 0 ? 100 : 0));
+      var convertDelta = hasMissingConvertRate ? null : baseConvertRate - compareConvertRate;
       var convertColor = hasMissingConvertRate ? 'var(--t3)' : (convertDelta > 0 ? 'var(--g)' : (convertDelta < 0 ? 'var(--r)' : 'var(--t3)'));
       var convertIcon = hasMissingConvertRate ? '−' : (convertDelta > 0 ? '▲' : (convertDelta < 0 ? '▼' : '−'));
 
       h += '<td style="text-align:center;padding:6px;font-weight:600;color:' + useColor + '">';
-      if(hasMissingUseRate){ h += '--'; } else { h += useIcon + ' ' + Math.abs(useDeltaPct).toFixed(2) + '%'; }
+      if(hasMissingUseRate){ h += '--'; } else { h += useIcon + ' ' + Math.abs(useDelta).toFixed(2) + 'pp'; }
       h += '</td>';
       h += '<td style="text-align:center;padding:6px;font-weight:600;color:' + convertColor + '">';
-      if(hasMissingConvertRate){ h += '--'; } else { h += convertIcon + ' ' + Math.abs(convertDeltaPct).toFixed(2) + '%'; }
+      if(hasMissingConvertRate){ h += '--'; } else { h += convertIcon + ' ' + Math.abs(convertDelta).toFixed(2) + 'pp'; }
       h += '</td>';
     });
 
@@ -6498,6 +6539,13 @@ function buildMetricDefinitionsHTML(){
   html += '<li>UV、使用用户数、使用率、付费转化率均为<strong>去重指标</strong>，必须按 user_id 去重聚合，不能由明细直接累加。</li>';
   html += '<li>当看板需要展示「板块 × 场景」「学段 × 学科」等交叉维度，而数仓只提供了单维度聚合时，对应单元格会显示"--"或"数据不足"。</li>';
   html += '<li>次数类指标（PV、下载、资源量）可直接累加，通常不会显示"--"。</li>';
+  html += '</ul>';
+
+  html += '<div class="metric-title">📉 对比变化说明</div>';
+  html += '<ul>';
+  html += '<li><strong>使用率变化情况</strong> = 现期使用率 − 基期使用率，结果以「pp（百分点）」表示，保留两位小数。</li>';
+  html += '<li><strong>付费转化变化情况</strong> = 现期付费转化率 − 基期付费转化率，结果以「pp（百分点）」表示，保留两位小数。</li>';
+  html += '<li>例如：现期使用率 40.97%，基期使用率 41.19%，则使用率变化情况为 −0.22pp。</li>';
   html += '</ul>';
 
   html += '<div class="metric-title">💡 看数提示</div>';
